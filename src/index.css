@@ -1,0 +1,232 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Archivo', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+
+  --color-stone: #f4f2ee;
+  --color-paper: #ffffff;
+  --color-line: #d9d3cb;
+  --color-line-strong: #b9b0a4;
+  --color-ink: #2b1a12;
+  --color-ink-soft: #6b5a50;
+  --color-ink-faint: #9a8b80;
+
+  --color-cold: #3b5f7a;
+  --color-cold-bg: #e4edf3;
+  --color-foil: #a8720e;
+  --color-foil-bg: #f7ecd2;
+  --color-hot: #b3311f;
+  --color-hot-bg: #f9e0dc;
+  --color-review: #5b4a8a;
+  --color-review-bg: #e9e3f5;
+
+  --color-cocoa: #4a2c1c;
+  --color-cocoa-deep: #2b1a12;
+
+  --radius-stamp: 4px;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  background: var(--color-stone);
+}
+
+body {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Wide, heavy face for stamps and headings — Archivo's variable width axis. */
+.display {
+  font-weight: 800;
+  font-stretch: 112%;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.2em 0.55em;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-stamp);
+  font-weight: 800;
+  font-stretch: 110%;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.stamp-none {
+  color: var(--color-cold);
+  background: var(--color-cold-bg);
+}
+.stamp-single {
+  color: var(--color-foil);
+  background: var(--color-foil-bg);
+}
+.stamp-double {
+  color: var(--color-hot);
+  background: var(--color-hot-bg);
+}
+.stamp-review {
+  color: var(--color-review);
+  background: var(--color-review-bg);
+}
+
+.temp {
+  font-weight: 800;
+  font-stretch: 105%;
+  font-size: 1.35rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  min-height: 44px;
+  padding: 0.55em 1.1em;
+  border-radius: 6px;
+  border: 1.5px solid var(--color-ink);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.btn:hover {
+  background: #efeae3;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--color-cocoa-deep);
+  color: #fff;
+  border-color: var(--color-cocoa-deep);
+}
+.btn-primary:hover {
+  background: var(--color-cocoa);
+}
+.btn-quiet {
+  border-color: var(--color-line-strong);
+  font-weight: 500;
+}
+
+.field {
+  min-height: 44px;
+  padding: 0.5em 0.7em;
+  border: 1.5px solid var(--color-line-strong);
+  border-radius: 6px;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font: inherit;
+  width: 100%;
+}
+.field:focus-visible,
+.btn:focus-visible,
+.tab:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--color-cold);
+  outline-offset: 2px;
+}
+
+.tab {
+  padding: 0.7em 0.2em;
+  margin-right: 1.4em;
+  border-bottom: 3px solid transparent;
+  color: var(--color-ink-soft);
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  min-height: 44px;
+}
+.tab[aria-selected='true'] {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-ink);
+}
+
+.sheet {
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+}
+
+table.bench {
+  width: 100%;
+  border-collapse: collapse;
+}
+table.bench th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  font-size: 0.8rem;
+  padding: 0.6em 0.7em;
+  border-bottom: 2px solid var(--color-ink);
+  white-space: nowrap;
+}
+table.bench td {
+  padding: 0.65em 0.7em;
+  border-bottom: 1px solid var(--color-line);
+  vertical-align: top;
+}
+table.bench tr:last-child td {
+  border-bottom: none;
+}
+
+.rule {
+  border: 0;
+  border-top: 1px solid var(--color-line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: #fff;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .sheet {
+    border: none;
+    border-radius: 0;
+  }
+  .stamp {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  table.bench td,
+  table.bench th {
+    padding: 0.4em 0.5em;
+  }
+  .print-break-inside-avoid {
+    break-inside: avoid;
+  }
+}
