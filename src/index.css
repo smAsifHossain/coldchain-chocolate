@@ -398,3 +398,107 @@ table.bench tr:last-child td {
     transition: none !important;
   }
 }
+
+/* ---------- App header ---------- */
+
+.app-header {
+  background: var(--color-cocoa-deep);
+  color: #fff;
+  border-bottom: 1px solid rgba(244, 242, 238, 0.12);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.25rem 0.25rem 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+.brand-name {
+  font-weight: 800;
+  font-stretch: 112%;
+  font-size: 1.35rem;
+  letter-spacing: -0.01em;
+}
+.brand-tag {
+  font-size: 0.78rem;
+  color: rgba(244, 242, 238, 0.62);
+}
+
+.app-nav {
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+  max-width: 100%;
+}
+.app-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: rgba(244, 242, 238, 0.72);
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+.nav-pill:hover {
+  color: #fff;
+  background: rgba(244, 242, 238, 0.08);
+}
+.nav-pill[aria-selected='true'] {
+  color: var(--color-cocoa-deep);
+  background: var(--color-stone);
+}
+.nav-pill:focus-visible {
+  outline: 3px solid #7fa7c4;
+  outline-offset: 2px;
+}
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35em;
+  height: 1.35em;
+  padding: 0 0.4em;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(244, 242, 238, 0.18);
+  color: inherit;
+}
+.nav-pill[aria-selected='true'] .nav-badge {
+  background: var(--color-cocoa-deep);
+  color: var(--color-stone);
+}
+
+@media (max-width: 767px) {
+  .brand-tag {
+    display: none;
+  }
+  .app-nav {
+    margin-left: 0;
+    width: 100%;
+  }
+}

@@ -7,6 +7,7 @@ import { PackListView } from './components/PackListView'
 import { PlannerView } from './components/PlannerView'
 import { SettingsView } from './components/SettingsView'
 import { AboutView } from './components/AboutView'
+import { Header } from './components/Header'
 
 type Tab = 'home' | 'orders' | 'packlist' | 'planner' | 'settings' | 'about'
 
@@ -52,30 +53,11 @@ export default function App() {
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-paper focus:p-2 focus:z-10">
         Skip to content
       </a>
-      <header className="bg-cocoa-deep text-white no-print">
-        <div className="mx-auto max-w-7xl px-4 md:px-6 py-3 flex items-center gap-4">
-          <button className="display text-xl tracking-tight text-white" onClick={() => go('home')} aria-label="ColdChain home">
-            ColdChain
-          </button>
-          <div className="text-white/70 text-sm hidden sm:block">Thermal pack planner for Cocoa Dolce</div>
-        </div>
-        <nav className="mx-auto max-w-7xl px-4 md:px-6 overflow-x-auto" aria-label="Sections">
-          <div role="tablist" className="flex">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                role="tab"
-                aria-selected={tab === t.id}
-                className="tab !text-white/70 aria-selected:!text-white aria-selected:!border-white whitespace-nowrap"
-                onClick={() => go(t.id)}
-              >
-                {t.label}
-                {t.id === 'packlist' && app.lines.length > 0 && <span className="ml-1 text-white/60">({app.lines.length})</span>}
-              </button>
-            ))}
-          </div>
-        </nav>
-      </header>
+      <Header
+        tabs={TABS.map((t) => (t.id === 'packlist' ? { ...t, badge: app.lines.length } : t))}
+        active={tab}
+        onSelect={go}
+      />
 
       <main id="main" tabIndex={-1} className={wide ? 'flex-1' : 'mx-auto w-full max-w-7xl px-4 md:px-6 py-5 flex flex-col gap-5 flex-1'}>
         {tab === 'home' && <Landing app={app} onOpenPlanner={() => go('orders')} onDemo={demo} onAbout={() => go('about')} />}
