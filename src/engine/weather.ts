@@ -1,6 +1,8 @@
-// Open-Meteo client: keyless, CORS-open, 16-day daily forecast, many
-// locations per request. Results are cached locally so a flaky connection
-// degrades to "yesterday's forecast, clearly labeled" rather than a blank page.
+// Forecast client. Open-Meteo first: keyless, CORS-open, 16 days, many
+// locations per request. If it is down, the National Weather Service (also
+// keyless, 7 days, one location per call) fills in. Results are cached locally
+// so a flaky connection degrades to "the last saved forecast, clearly labeled"
+// rather than a blank page.
 
 import type { DailyForecast, LocationForecast } from './types'
 
@@ -26,6 +28,8 @@ export interface FetchOptions {
   ttlMs?: number
   batchSize?: number
   forecastDays?: number
+  /** How many points to try against the NWS when Open-Meteo fails (each is two requests). */
+  nwsMaxPoints?: number
 }
 
 export interface FetchResult {
@@ -34,11 +38,16 @@ export interface FetchResult {
   missing: string[]
   /** Keys served from cache because the refresh failed. */
   stale: string[]
+  /** Keys served by the National Weather Service because Open-Meteo failed. */
+  fallback: string[]
   errors: string[]
 }
 
 const API = 'https://api.open-meteo.com/v1/forecast'
+const NWS = 'https://api.weather.gov'
 const DEFAULT_TTL = 6 * 60 * 60 * 1000
+/** NWS is one location per two requests; cap how many we try when Open-Meteo is down. */
+const NWS_MAX_POINTS = 40
 
 interface OpenMeteoLocation {
   latitude: number
@@ -99,6 +108,39 @@ async function fetchBatch(points: GeoPoint[], opts: Required<Pick<FetchOptions, 
   throw lastError instanceof Error ? lastError : new Error(String(lastError))
 }
 
+interface NwsPeriod {
+  startTime: string
+  isDaytime: boolean
+  temperature: number
+  temperatureUnit: string
+}
+
+/**
+ * National Weather Service: /points resolves the grid, then /forecast gives
+ * 7 days of day/night periods. Daytime periods are highs, night periods lows.
+ */
+async function fetchNws(p: GeoPoint, fetchImpl: typeof fetch, now: number): Promise<LocationForecast> {
+  const pt = await fetchImpl(`${NWS}/points/${p.lat.toFixed(4)},${p.lon.toFixed(4)}`, { headers: { Accept: 'application/geo+json' } })
+  if (!pt.ok) throw new Error(`NWS points ${pt.status}`)
+  const url = ((await pt.json()) as { properties?: { forecast?: string } }).properties?.forecast
+  if (!url) throw new Error('NWS has no forecast for this point')
+  const fc = await fetchImpl(url, { headers: { Accept: 'application/geo+json' } })
+  if (!fc.ok) throw new Error(`NWS forecast ${fc.status}`)
+  const periods = ((await fc.json()) as { properties?: { periods?: NwsPeriod[] } }).properties?.periods ?? []
+  const highs = new Map<string, number>()
+  const lows = new Map<string, number>()
+  for (const per of periods) {
+    const date = per.startTime.slice(0, 10)
+    const temp = per.temperatureUnit === 'C' ? (per.temperature * 9) / 5 + 32 : per.temperature
+    if (per.isDaytime) highs.set(date, Math.max(highs.get(date) ?? -Infinity, temp))
+    else lows.set(date, Math.min(lows.get(date) ?? Infinity, temp))
+  }
+  const days: DailyForecast[] = []
+  for (const [date, high] of highs) days.push({ date, high, low: lows.get(date) ?? high - 15 })
+  days.sort((a, b) => (a.date < b.date ? -1 : 1))
+  return { lat: p.lat, lon: p.lon, days, fetchedAt: now, stale: false, source: 'nws' }
+}
+
 /**
  * Returns a forecast for every distinct point. Fresh cache hits are used as-is;
  * everything else is fetched in batches. On failure, any cached copy (however
@@ -115,7 +157,7 @@ export async function getForecasts(points: GeoPoint[], options: FetchOptions = {
   const unique = new Map<string, GeoPoint>()
   for (const p of points) unique.set(pointKey(p), { lat: Number(p.lat.toFixed(2)), lon: Number(p.lon.toFixed(2)) })
 
-  const result: FetchResult = { forecasts: new Map(), missing: [], stale: [], errors: [] }
+  const result: FetchResult = { forecasts: new Map(), missing: [], stale: [], fallback: [], errors: [] }
   const toFetch: GeoPoint[] = []
 
   for (const [key, p] of unique) {
@@ -132,15 +174,33 @@ export async function getForecasts(points: GeoPoint[], options: FetchOptions = {
     try {
       const raw = await fetchBatch(batch, { fetchImpl, forecastDays })
       batch.forEach((p, idx) => {
-        const fc = toForecast(p, raw[idx], now)
+        const fc = { ...toForecast(p, raw[idx], now), source: 'open-meteo' as const }
         const key = pointKey(p)
         result.forecasts.set(key, fc)
         cache?.set(key, fc)
       })
     } catch (err) {
       result.errors.push(err instanceof Error ? err.message : String(err))
+      let nwsBudget = options.nwsMaxPoints ?? NWS_MAX_POINTS
+      let nwsFailed = false
       for (const p of batch) {
         const key = pointKey(p)
+        // Second provider first, then whatever the cache still holds.
+        if (nwsBudget > 0 && !nwsFailed) {
+          nwsBudget--
+          try {
+            const fc = await fetchNws(p, fetchImpl, now)
+            if (fc.days.length > 0) {
+              result.forecasts.set(key, fc)
+              result.fallback.push(key)
+              cache?.set(key, fc)
+              continue
+            }
+          } catch (e) {
+            nwsFailed = true
+            result.errors.push(`NWS: ${e instanceof Error ? e.message : String(e)}`)
+          }
+        }
         const cached = cache?.get(key)
         if (cached && cached.days.length > 0) {
           result.forecasts.set(key, { ...cached, stale: true })

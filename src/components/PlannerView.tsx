@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { addDays, formatShort, isWeekend, planShipDays, TIER_RANK, weekdayName, type Decision, type Tier } from '../engine'
+import { addDays, boxesFor, formatShort, isWeekend, planShipDays, TIER_RANK, weekdayName, type Decision, type Tier } from '../engine'
 import type { AppApi } from '../app/useApp'
 
 const DAYS = 7
@@ -12,8 +12,8 @@ export function PlannerView({ app }: { app: AppApi }) {
   const ctx = app.ctx
   const plan = useMemo(() => {
     if (!ctx) return []
-    return app.orders.map((order) => ({ order, days: planShipDays(order, ctx, DAYS) }))
-  }, [ctx, app.orders])
+    return app.lines.map((line) => ({ order: line.order, boxes: boxesFor(line), days: planShipDays(line.order, ctx, DAYS) }))
+  }, [ctx, app.lines])
 
   if (!ctx || plan.length === 0) {
     return (
@@ -28,23 +28,43 @@ export function PlannerView({ app }: { app: AppApi }) {
   const dayTotals = dates.map((_, i) => {
     let double = 0
     let ok = 0
+    let cost = 0
+    let icePacks = 0
     for (const p of plan) {
       const d = p.days[i].decision
       if (d.status !== 'ok') continue
       ok++
       if (d.tier === 'double') double++
+      cost += d.cost * p.boxes
+      icePacks += d.icePacks * p.boxes
     }
-    return { double, ok }
+    return { double, ok, cost: Math.round(cost * 100) / 100, icePacks }
   })
-  const bestIdx = dayTotals.reduce((best, t, i) => (isWeekend(dates[i]) ? best : t.double < dayTotals[best].double ? i : best), firstWeekday(dates))
+  const bestIdx = dayTotals.reduce(
+    (best, t, i) => (isWeekend(dates[i]) ? best : t.double < dayTotals[best].double || (t.double === dayTotals[best].double && t.cost < dayTotals[best].cost) ? i : best),
+    firstWeekday(dates),
+  )
+  const today = dayTotals[0]
+  const best = dayTotals[bestIdx]
+  const saving = Math.round((today.cost - best.cost) * 100) / 100
 
   return (
     <section className="sheet overflow-hidden" aria-label="Ship-day planner">
       <div className="px-5 py-4 border-b border-line">
         <h2 className="display text-lg">Which day to ship</h2>
         <p className="text-ink-soft text-sm">
-          Each cell is the tier if that order ships that day. Weekends have no pickup. Best day for the whole batch:{' '}
-          <strong className="text-ink">{formatShort(dates[bestIdx])}</strong> ({dayTotals[bestIdx].double} of {dayTotals[bestIdx].ok} need ice).
+          Each cell is the tier if that order ships that day. Weekends have no pickup.{' '}
+          {bestIdx === 0 ? (
+            <>
+              <strong className="text-ink">{formatShort(dates[0])}</strong> is already the best day this week: {today.double} of {today.ok} need ice, about ${today.cost.toFixed(2)} in packaging.
+            </>
+          ) : (
+            <>
+              Ship <strong className="text-ink">{formatShort(dates[bestIdx])}</strong> instead of {formatShort(dates[0])}: {today.double - best.double} fewer box
+              {today.double - best.double === 1 ? '' : 'es'} on ice, {today.icePacks - best.icePacks} fewer ice pack{today.icePacks - best.icePacks === 1 ? '' : 's'},{' '}
+              {saving > 0 ? `about $${saving.toFixed(2)} less packaging` : 'about the same packaging cost'}.
+            </>
+          )}
         </p>
       </div>
       <div className="overflow-x-auto">
@@ -90,6 +110,16 @@ export function PlannerView({ app }: { app: AppApi }) {
               {dayTotals.map((t, i) => (
                 <td key={i} className={`text-center font-semibold ${i === bestIdx ? 'bg-cold-bg' : ''}`}>
                   {isWeekend(dates[i]) ? <span className="text-ink-faint">—</span> : `${t.double} / ${t.ok}`}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <th scope="row" className="text-left">
+                Packaging
+              </th>
+              {dayTotals.map((t, i) => (
+                <td key={i} className={`text-center text-sm ${i === bestIdx ? 'bg-cold-bg font-semibold' : 'text-ink-soft'}`}>
+                  {isWeekend(dates[i]) ? <span className="text-ink-faint">—</span> : `${t.cost.toFixed(2)}`}
                 </td>
               ))}
             </tr>

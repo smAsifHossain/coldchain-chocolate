@@ -1,12 +1,14 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   addDays,
+  boxesFor,
   effectiveTier,
   formatShort,
   lineMaterials,
   SERVICE_LABEL,
   sortForBench,
   TIER_LABEL,
+  tierOverridden,
   toCsv,
   downloadText,
   type ImportResult,
@@ -120,6 +122,11 @@ function InputDock({ app }: { app: AppApi }) {
           max={maxDate}
           onChange={(e) => e.target.value && app.setShipDate(e.target.value)}
         />
+        {app.cutoff.afterCutoff && app.shipDate === app.cutoff.date && (
+          <p className="text-sm text-foil" role="status">
+            Past today's {app.settings.pickupCutoff} pickup — planning for {formatShort(app.shipDate)}.
+          </p>
+        )}
         <p className="text-ink-faint text-xs">Forecasts reach 16 days out; confidence drops after 7.</p>
       </div>
 
@@ -141,9 +148,44 @@ function InputDock({ app }: { app: AppApi }) {
   )
 }
 
+type Filter = 'all' | Tier | 'review' | 'flagged'
+
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'double', label: 'Double + ice' },
+  { id: 'single', label: 'Single' },
+  { id: 'none', label: 'No thermal' },
+  { id: 'flagged', label: 'Needs a look' },
+  { id: 'review', label: 'Check by hand' },
+]
+
 function Results({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => void }) {
   const [open, setOpen] = useState<string | null>(null)
-  const lines = sortForBench(app.lines)
+  const [filter, setFilter] = useState<Filter>('all')
+  const [query, setQuery] = useState('')
+  const all = useMemo(() => sortForBench(app.lines), [app.lines])
+  const lines = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return all.filter((l) => {
+      const d = l.decision
+      if (filter === 'review' && d.status === 'ok') return false
+      if (filter === 'flagged' && !d.recommendation && d.warnings.length === 0) return false
+      if ((filter === 'double' || filter === 'single' || filter === 'none') && (d.status !== 'ok' || effectiveTier(l) !== filter)) return false
+      if (!q) return true
+      const hay = [d.orderId, l.order.customer, d.place, d.zip, l.order.shippingMethod, ...(l.order.lineItems ?? [])].join(' ').toLowerCase()
+      return hay.includes(q)
+    })
+  }, [all, filter, query])
+  const counts = useMemo(() => {
+    const c: Record<Filter, number> = { all: all.length, double: 0, single: 0, none: 0, flagged: 0, review: 0 }
+    for (const l of all) {
+      const d = l.decision
+      if (d.status !== 'ok') c.review++
+      else c[effectiveTier(l)]++
+      if (d.recommendation || d.warnings.length > 0) c.flagged++
+    }
+    return c
+  }, [all])
 
   if (app.orders.length === 0) {
     return (
@@ -186,7 +228,7 @@ function Results({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => v
           </span>
         )}
         <div className="ml-auto flex gap-2">
-          <button className="btn btn-quiet" onClick={() => downloadText(`pack-list-${app.shipDate}.csv`, toCsv(lines, app.settings))}>
+          <button className="btn btn-quiet" onClick={() => downloadText(`pack-list-${app.shipDate}.csv`, toCsv(all, app.settings))}>
             Export CSV
           </button>
           <button className="btn" onClick={onGoToPackList}>
@@ -194,6 +236,31 @@ function Results({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => v
           </button>
         </div>
       </div>
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-line no-print" role="group" aria-label="Filter decisions">
+        {FILTERS.map((f) =>
+          counts[f.id] > 0 || f.id === 'all' ? (
+            <button
+              key={f.id}
+              className={`btn btn-quiet !min-h-9 !py-1 !px-3 text-sm ${filter === f.id ? '!bg-ink !text-white !border-ink' : ''}`}
+              aria-pressed={filter === f.id}
+              onClick={() => setFilter(f.id)}
+            >
+              {f.label} <span className={filter === f.id ? 'text-white/70' : 'text-ink-faint'}>{counts[f.id]}</span>
+            </button>
+          ) : null,
+        )}
+        <input
+          type="search"
+          className="field !min-h-9 !py-1 !w-56 ml-auto text-sm"
+          placeholder="Find an order, name, city, zip…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search orders"
+        />
+      </div>
+      {lines.length === 0 && (
+        <p className="px-4 py-6 text-ink-soft text-sm">Nothing matches. Clear the search or pick another filter.</p>
+      )}
       <div className="overflow-x-auto">
         <table className="bench">
           <thead>
@@ -283,7 +350,7 @@ function Row({ line, app, open, onToggle, index }: { line: PackLine; app: AppApi
         </td>
         <td>{d.status === 'ok' ? formatShort(d.deliveryDate) : '—'}</td>
         <td>
-          <TripStrip decision={d} settings={app.settings} />
+          <TripStrip decision={d} />
         </td>
         <td>
           {d.worst ? (
@@ -303,7 +370,8 @@ function Row({ line, app, open, onToggle, index }: { line: PackLine; app: AppApi
           <span className="stamp-in inline-block" style={{ ['--stagger' as string]: stagger }}>
             <TierStamp tier={tier} status={d.status} />
           </span>
-          {line.override && <div className="text-ink-soft text-xs mt-1">changed by hand</div>}
+          {tierOverridden(line) && <div className="text-ink-soft text-xs mt-1">changed by hand</div>}
+          {boxesFor(line) > 1 && <div className="text-ink-soft text-xs mt-1">{boxesFor(line)} boxes</div>}
         </td>
         <td className="whitespace-nowrap">
           {m.liners || m.icePacks ? (
@@ -348,13 +416,20 @@ function Row({ line, app, open, onToggle, index }: { line: PackLine; app: AppApi
 function Details({ line, app }: { line: PackLine; app: AppApi }) {
   const d = line.decision
   const [note, setNote] = useState(line.override?.note ?? '')
+  const current = line.override ?? {}
   const setTier = (tier: Tier | '') => {
-    if (tier === '' || tier === d.tier) app.setOverride(line.order.id, null)
-    else app.setOverride(line.order.id, { tier, note })
+    const next = { ...current, note }
+    if (tier === '' || tier === d.tier) delete next.tier
+    else next.tier = tier
+    app.setOverride(line.order.id, next)
   }
-  const saveNote = () => {
-    if (line.override) app.setOverride(line.order.id, { ...line.override, note })
+  const setBoxes = (n: number) => {
+    const next = { ...current, note }
+    if (!Number.isFinite(n) || n <= 1) delete next.boxes
+    else next.boxes = Math.round(n)
+    app.setOverride(line.order.id, next)
   }
+  const saveNote = () => app.setOverride(line.order.id, { ...current, note })
 
   return (
     <div className="grid gap-5 md:grid-cols-[1fr_1fr] py-2">
@@ -439,7 +514,20 @@ function Details({ line, app }: { line: PackLine; app: AppApi }) {
                 </option>
               ))}
             </select>
-            {line.override && (
+            <label className="flex items-center gap-2 text-sm">
+              Ships as
+              <input
+                type="number"
+                className="field !w-16 !min-h-10"
+                min={1}
+                max={50}
+                value={boxesFor(line)}
+                onChange={(e) => setBoxes(Number(e.target.value))}
+                aria-label="Number of boxes"
+              />
+              box{boxesFor(line) === 1 ? '' : 'es'}
+            </label>
+            {(tierOverridden(line) || boxesFor(line) > 1 || note) && (
               <input
                 className="field !w-auto flex-1 min-w-[12rem]"
                 placeholder="Why? (shows on the pack list)"

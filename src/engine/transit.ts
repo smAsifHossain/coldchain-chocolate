@@ -1,10 +1,11 @@
-import { addDays, dayOfWeek, dateRange, type ISODate } from './dates'
+import { addDays, dayOfWeek, dateRange, isCarrierHoliday, type ISODate } from './dates'
 import { NON_CONTIGUOUS } from './zip'
 import type { ServiceLevel, Settings } from './types'
 
 /** Maps free-text Shopify shipping methods onto a service level. */
 export function parseServiceLevel(method: string | undefined | null): ServiceLevel {
   const m = (method ?? '').toLowerCase()
+  if (/pick[\s-]?up|in[\s-]?store|collect/.test(m)) return 'pickup'
   if (/overnight|next[\s-]?day|priority overnight|1[\s-]?day|express saver|first overnight/.test(m)) {
     return 'overnight'
   }
@@ -18,7 +19,11 @@ export const SERVICE_LABEL: Record<ServiceLevel, string> = {
   ground: 'Ground',
   two_day: '2-Day',
   overnight: 'Overnight',
+  pickup: 'Store pickup',
 }
+
+/** Military mail (APO/FPO/DPO) uses USPS and can take weeks. */
+export const MILITARY = new Set(['AA', 'AE', 'AP'])
 
 export interface TransitEstimate {
   days: number
@@ -33,7 +38,10 @@ export function estimateTransitDays(
   service: ServiceLevel,
   settings: Settings,
 ): TransitEstimate {
-  const nonContiguous = !!state && NON_CONTIGUOUS.has(state)
+  const nonContiguous = !!state && (NON_CONTIGUOUS.has(state) || MILITARY.has(state))
+  if (service === 'pickup') {
+    return { days: 0, basis: 'Store pickup — never enters a carrier network', nonContiguous: false }
+  }
   if (service === 'overnight') {
     return { days: settings.transit.overnightDays, basis: 'Overnight service', nonContiguous }
   }
@@ -41,7 +49,7 @@ export function estimateTransitDays(
     return { days: settings.transit.twoDayDays, basis: '2-Day service', nonContiguous }
   }
   if (nonContiguous) {
-    return { days: settings.transit.farDays, basis: `Ground to ${state}`, nonContiguous }
+    return { days: settings.transit.farDays, basis: MILITARY.has(state!) ? `Military mail to ${state}` : `Ground to ${state}`, nonContiguous }
   }
   if (distanceMiles === null) {
     return { days: settings.transit.farDays, basis: 'Distance unknown — assumed longest ground transit', nonContiguous }
@@ -54,22 +62,24 @@ export function estimateTransitDays(
   return { days: settings.transit.farDays, basis: `Ground, ${Math.round(distanceMiles)} mi (beyond last zone)`, nonContiguous }
 }
 
-/** Carriers pick up Monday–Friday; a weekend ship date effectively ships Monday. */
-export function effectiveShipDate(shipDate: ISODate): { date: ISODate; shifted: boolean } {
+/** Carriers pick up Monday–Friday, not on holidays; a weekend ship date effectively ships Monday. */
+export function effectiveShipDate(shipDate: ISODate, observeHolidays = true): { date: ISODate; shifted: boolean; holiday: boolean } {
   let d = shipDate
   let shifted = false
-  while (dayOfWeek(d) === 0 || dayOfWeek(d) === 6) {
+  let holiday = false
+  while (dayOfWeek(d) === 0 || dayOfWeek(d) === 6 || (observeHolidays && isCarrierHoliday(d))) {
+    if (observeHolidays && isCarrierHoliday(d)) holiday = true
     d = addDays(d, 1)
     shifted = true
   }
-  return { date: d, shifted }
+  return { date: d, shifted, holiday }
 }
 
 /**
  * Counts transit days over days the carrier moves packages: Mon–Fri, plus
  * Saturday when the carrier delivers on Saturdays. Sunday never counts.
  */
-export function deliveryDate(shipDate: ISODate, transitDays: number, saturdayDelivery: boolean): ISODate {
+export function deliveryDate(shipDate: ISODate, transitDays: number, saturdayDelivery: boolean, observeHolidays = true): ISODate {
   let d = shipDate
   let remaining = transitDays
   while (remaining > 0) {
@@ -77,9 +87,15 @@ export function deliveryDate(shipDate: ISODate, transitDays: number, saturdayDel
     const dow = dayOfWeek(d)
     if (dow === 0) continue
     if (dow === 6 && !saturdayDelivery) continue
+    if (observeHolidays && isCarrierHoliday(d)) continue
     remaining--
   }
   return d
+}
+
+/** The first carrier holiday inside the transit window, if any. */
+export function spansHoliday(shipDate: ISODate, delivery: ISODate): ISODate | null {
+  return inTransitDates(shipDate, delivery).find((d) => isCarrierHoliday(d)) ?? null
 }
 
 /** Calendar days strictly between ship and delivery: the package is on a truck or in a hub. */

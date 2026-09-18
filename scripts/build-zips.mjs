@@ -4,7 +4,8 @@
 //   npm run zips
 //
 // Output: public/data/zips.json  →  { "67202": [37.69, -97.34, "Wichita", "KS"], ... }
-// Source: https://download.geonames.org/export/zip/US.zip  (CC BY 4.0, geonames.org)
+// Sources: https://download.geonames.org/export/zip/{US,PR,VI,GU}.zip  (CC BY 4.0, geonames.org)
+// Territories carry their postal abbreviation (PR, VI, GU) in the state slot.
 
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
@@ -15,18 +16,22 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const cacheDir = join(here, '.cache')
-const zipPath = join(cacheDir, 'US.zip')
 const outPath = join(here, '..', 'public', 'data', 'zips.json')
-const SOURCE = 'https://download.geonames.org/export/zip/US.zip'
+const COUNTRIES = ['US', 'PR', 'VI', 'GU']
 
 mkdirSync(cacheDir, { recursive: true })
 mkdirSync(dirname(outPath), { recursive: true })
 
-if (!existsSync(zipPath)) {
-  console.log(`downloading ${SOURCE}`)
-  const res = await fetch(SOURCE)
-  if (!res.ok) throw new Error(`download failed: ${res.status}`)
-  await pipeline(Readable.fromWeb(res.body), createWriteStream(zipPath))
+async function ensure(country) {
+  const zipPath = join(cacheDir, `${country}.zip`)
+  if (!existsSync(zipPath)) {
+    const url = `https://download.geonames.org/export/zip/${country}.zip`
+    console.log(`downloading ${url}`)
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`download failed: ${res.status}`)
+    await pipeline(Readable.fromWeb(res.body), createWriteStream(zipPath))
+  }
+  return zipPath
 }
 
 // Minimal ZIP reader: locate the entry via the central directory (local headers
@@ -58,22 +63,24 @@ function readZipEntry(buf, wanted) {
   throw new Error(`${wanted} not found in archive`)
 }
 
-const txt = readZipEntry(readFileSync(zipPath), 'US.txt').toString('utf8')
-
 // GeoNames columns: country, postal_code, place_name, admin_name1, admin_code1,
 // admin_name2, admin_code2, admin_name3, admin_code3, latitude, longitude, accuracy
 const table = {}
 let rows = 0
-for (const line of txt.split('\n')) {
-  if (!line) continue
-  const c = line.split('\t')
-  const zip = c[1]
-  if (!/^\d{5}$/.test(zip) || zip in table) continue
-  const lat = Number(c[9])
-  const lon = Number(c[10])
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
-  table[zip] = [Math.round(lat * 100) / 100, Math.round(lon * 100) / 100, c[2], c[4]]
-  rows++
+for (const country of COUNTRIES) {
+  const txt = readZipEntry(readFileSync(await ensure(country)), `${country}.txt`).toString('utf8')
+  for (const line of txt.split('\n')) {
+    if (!line) continue
+    const c = line.split('\t')
+    const zip = c[1]
+    if (!/^\d{5}$/.test(zip) || zip in table) continue
+    const lat = Number(c[9])
+    const lon = Number(c[10])
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+    const state = country === 'US' ? c[4] : country
+    table[zip] = [Math.round(lat * 100) / 100, Math.round(lon * 100) / 100, c[2], state]
+    rows++
+  }
 }
 
 const json = JSON.stringify(table)

@@ -7,6 +7,12 @@ import type { Settings } from './types'
  */
 export const DEFAULT_SETTINGS: Settings = {
   originZip: '67202',
+  pickupCutoff: '15:00',
+  observeHolidays: true,
+  productRules: [
+    { label: 'Cream centers: truffles, ganache, caramels, bonbons', pattern: 'truffle|ganache|caramel|bonbon|cream', offset: -5 },
+    { label: 'White or milk chocolate', pattern: 'white|milk', offset: -3 },
+  ],
   thresholds: { single: 65, double: 80, hold: 95 },
   coldRule: { enabled: false, below: 20 },
   transit: {
@@ -82,6 +88,15 @@ export function validateSettings(s: Settings): string[] {
   if (!(t.single < t.double)) problems.push('Single-thermal threshold must be below the double-thermal threshold.')
   if (!(t.double <= t.hold)) problems.push('Hold threshold must be at or above the double-thermal threshold.')
   if (!/^\d{5}$/.test(s.originZip)) problems.push('Origin zip must be 5 digits.')
+  if (!/^\d{2}:\d{2}$/.test(s.pickupCutoff)) problems.push('Pickup time must look like 15:00.')
+  for (const r of s.productRules) {
+    try {
+      new RegExp(r.pattern, 'i')
+    } catch {
+      problems.push(`Product rule "${r.label || r.pattern}" is not a valid pattern.`)
+    }
+    if (r.offset > 0) problems.push(`Product rule "${r.label}" raises the thresholds — rules can only make the call more careful.`)
+  }
   let prev = 0
   for (const z of s.transit.zones) {
     if (z.maxMiles <= prev) problems.push('Transit zones must have increasing mile limits.')

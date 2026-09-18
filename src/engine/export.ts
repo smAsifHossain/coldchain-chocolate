@@ -1,7 +1,7 @@
 import { formatShort } from './dates'
 import { SERVICE_LABEL } from './transit'
 import { TIER_LABEL } from './decide'
-import { effectiveTier, lineMaterials, type PackLine } from './packlist'
+import { boxesFor, effectiveTier, lineMaterials, tierOverridden, type PackLine } from './packlist'
 import type { Settings } from './types'
 
 function csvCell(v: string | number | null | undefined): string {
@@ -17,6 +17,7 @@ export function toCsv(lines: PackLine[], settings: Settings): string {
     'Destination',
     'Zip',
     'Pieces',
+    'Boxes',
     'Shipping method',
     'Speed',
     'Ship date',
@@ -45,6 +46,7 @@ export function toCsv(lines: PackLine[], settings: Settings): string {
       d.place,
       d.zip,
       l.order.qty,
+      boxesFor(l),
       l.order.shippingMethod ?? '',
       SERVICE_LABEL[d.serviceLevel],
       d.shipDate,
@@ -54,7 +56,7 @@ export function toCsv(lines: PackLine[], settings: Settings): string {
       d.worst?.place ?? '',
       d.worst ? formatShort(d.worst.date) : '',
       TIER_LABEL[tier],
-      l.override ? 'yes' : '',
+      tierOverridden(l) ? 'yes' : '',
       l.override?.note ?? '',
       m.liners,
       m.icePacks,

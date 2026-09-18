@@ -8,8 +8,10 @@ import {
   effectiveShipDate,
   estimateTransitDays,
   inTransitDates,
+  MILITARY,
   parseServiceLevel,
   SERVICE_LABEL,
+  spansHoliday,
   spansWeekend,
 } from './transit'
 import { dayAt, pointKey, type ForecastMap, type GeoPoint } from './weather'
@@ -78,10 +80,38 @@ export function placeLabel(p: Place): string {
   return `${p.city}, ${p.state}`
 }
 
-function tierFor(high: number, s: Settings): Tier {
-  if (high >= s.thresholds.double) return 'double'
-  if (high >= s.thresholds.single) return 'single'
+type Thresholds = Settings['thresholds']
+
+function tierFor(high: number, t: Thresholds): Tier {
+  if (high >= t.double) return 'double'
+  if (high >= t.single) return 'single'
   return 'none'
+}
+
+/**
+ * Thresholds for this box: the most sensitive matching product rule lowers
+ * every threshold. Rules can only make the call more careful.
+ */
+export function thresholdsForOrder(order: Order, s: Settings): { thresholds: Thresholds; rule: Settings['productRules'][number] | null } {
+  const items = (order.lineItems ?? []).join(' | ')
+  let best: Settings['productRules'][number] | null = null
+  if (items) {
+    for (const r of s.productRules) {
+      let re: RegExp
+      try {
+        re = new RegExp(r.pattern, 'i')
+      } catch {
+        continue
+      }
+      if (r.offset < 0 && re.test(items) && (!best || r.offset < best.offset)) best = r
+    }
+  }
+  if (!best) return { thresholds: s.thresholds, rule: null }
+  const o = best.offset
+  return {
+    thresholds: { single: s.thresholds.single + o, double: s.thresholds.double + o, hold: s.thresholds.hold + o },
+    rule: best,
+  }
 }
 
 export function materialsFor(tier: Tier, transitDays: number, s: Settings): { liners: number; icePacks: number; cost: number; note: string | null } {
@@ -157,6 +187,15 @@ function buildWindow(
   return { window, worst, coldest, missingDates: [...missing] }
 }
 
+/** A pickup is exposed only on the day it is collected, at the origin. */
+function buildPickupWindow(date: ISODate, ctx: DecideContext): WindowBuild {
+  const originFc = ctx.forecasts.get(pointKey(ctx.origin))
+  const day = dayAt(originFc, date)
+  const point: ExposurePoint = { date, place: placeLabel(ctx.origin), role: 'origin', high: day?.high ?? null, low: day?.low ?? null }
+  const ok = point.high !== null && point.low !== null
+  return { window: [point], worst: ok ? point : null, coldest: ok ? point : null, missingDates: ok ? [] : [date] }
+}
+
 interface DecideOptions {
   /** Skip the search for better ship dates / service levels (used when evaluating alternatives). */
   noAlternatives?: boolean
@@ -171,6 +210,7 @@ function reviewDecision(order: Order, resolved: ResolvedOrder, ctx: DecideContex
   const label = order.city && order.state ? `${order.city}, ${order.state}` : order.city || order.country || ''
   return {
     orderId: order.id,
+    thresholds: s.thresholds,
     zip: resolved.zip ?? String(order.zip ?? ''),
     place: label,
     status: 'needs_review',
@@ -210,21 +250,46 @@ export function decide(order: Order, ctx: DecideContext, opts: DecideOptions = {
   const service = opts.serviceOverride ?? order.serviceLevel ?? parseServiceLevel(order.shippingMethod)
   const distance = haversineMiles(ctx.origin.lat, ctx.origin.lon, dest.lat, dest.lon)
   const transit = estimateTransitDays(distance, dest.state, service, s)
+  const { thresholds: th, rule } = thresholdsForOrder(order, s)
+  const pickup = service === 'pickup'
 
   const requested = opts.shipDateOverride ?? ctx.shipDate
-  const ship = effectiveShipDate(requested)
-  if (ship.shifted) warnings.push(`${formatShort(requested)} is a weekend — no pickup, so this ships ${formatShort(ship.date)}.`)
-  const delivery = deliveryDate(ship.date, transit.days, s.saturdayDelivery)
+  // A pickup happens whenever the customer walks in; shipments wait for the next carrier day.
+  const ship = pickup ? { date: requested, shifted: false, holiday: false } : effectiveShipDate(requested, s.observeHolidays)
+  if (ship.shifted) {
+    warnings.push(
+      `${formatShort(requested)} is a ${ship.holiday ? 'carrier holiday' : 'weekend'} — no pickup, so this ships ${formatShort(ship.date)}.`,
+    )
+  }
+  const delivery = pickup ? ship.date : deliveryDate(ship.date, transit.days, s.saturdayDelivery, s.observeHolidays)
 
-  reasons.push(`${transit.basis} → ${transit.days} transit day${transit.days === 1 ? '' : 's'}, delivered ${formatShort(delivery)}.`)
-  if (transit.nonContiguous && service === 'ground') warnings.push(`Ground to ${dest.state} is slow and unpredictable — consider air service.`)
+  if (pickup) {
+    reasons.push(`Store pickup — judged on ${placeLabel(ctx.origin)}'s high the day it is collected, ${formatShort(ship.date)}.`)
+  } else {
+    reasons.push(`${transit.basis} → ${transit.days} transit day${transit.days === 1 ? '' : 's'}, delivered ${formatShort(delivery)}.`)
+  }
+  if (transit.nonContiguous && service === 'ground') {
+    warnings.push(
+      MILITARY.has(dest.state)
+        ? 'Military address — USPS only, and transit can take weeks. Ice will not last; ship the least heat-sensitive products or hold for cooler weather.'
+        : `Ground to ${dest.state} is slow and unpredictable — consider air service.`,
+    )
+  }
+  if (!pickup && s.observeHolidays) {
+    const hol = spansHoliday(ship.date, delivery)
+    if (hol) warnings.push(`${formatShort(hol)} is a carrier holiday — the box sits still that day; delivery already accounts for it.`)
+  }
+  if (rule) {
+    reasons.push(`${rule.label} in the box — thresholds lowered ${Math.abs(rule.offset)}°F (single from ${th.single}°F, double from ${th.double}°F).`)
+  }
 
-  const built = buildWindow(dest, ship.date, delivery, ctx)
+  const built = pickup ? buildPickupWindow(ship.date, ctx) : buildWindow(dest, ship.date, delivery, ctx)
 
   if (!built.worst) {
     const mats = materialsFor('double', transit.days, s)
     return {
       orderId: order.id,
+      thresholds: th,
       zip: resolved.zip,
       place: placeLabel(dest),
       status: 'no_forecast',
@@ -248,15 +313,15 @@ export function decide(order: Order, ctx: DecideContext, opts: DecideOptions = {
   }
 
   const worst = built.worst
-  let tier = tierFor(worst.high!, s)
+  let tier = tierFor(worst.high!, th)
   const roleText: Record<ExposurePoint['role'], string> = {
-    origin: 'ship day',
+    origin: pickup ? 'pickup day' : 'ship day',
     route: 'in transit',
     transit: 'in transit',
     destination: 'delivery day',
     porch: 'day after delivery',
   }
-  const threshold = tier === 'double' ? `≥ ${s.thresholds.double}°F` : tier === 'single' ? `≥ ${s.thresholds.single}°F` : `< ${s.thresholds.single}°F`
+  const threshold = tier === 'double' ? `≥ ${th.double}°F` : tier === 'single' ? `≥ ${th.single}°F` : `< ${th.single}°F`
   reasons.unshift(
     `Worst case ${fmtTemp(worst.high!)} in ${worst.place} on ${formatShort(worst.date)} (${roleText[worst.role]}) — ${threshold} → ${TIER_LABEL[tier]}.`,
   )
@@ -269,7 +334,7 @@ export function decide(order: Order, ctx: DecideContext, opts: DecideOptions = {
   if (built.missingDates.length > 0) {
     warnings.push(`No forecast yet for ${built.missingDates.map(formatShort).join(', ')} — decision uses the days that are available.`)
   }
-  if (tier !== 'none' && spansWeekend(ship.date, delivery)) {
+  if (!pickup && tier !== 'none' && spansWeekend(ship.date, delivery)) {
     warnings.push('Sits in a carrier hub over the weekend. Shipping Monday–Wednesday avoids this.')
   }
 
@@ -282,15 +347,16 @@ export function decide(order: Order, ctx: DecideContext, opts: DecideOptions = {
 
   let recommendation: Recommendation | null = null
   if (!opts.noAlternatives) {
-    const tooHot = worst.high! >= s.thresholds.hold
+    const tooHot = worst.high! >= th.hold
     const longHot = tier === 'double' && transit.days >= s.longHotTransitDays
-    if (tooHot || longHot) {
+    if (!pickup && (tooHot || longHot)) {
       recommendation = recommend(order, ctx, { service, tier, worstHigh: worst.high!, tooHot, transitDays: transit.days })
     }
   }
 
   return {
     orderId: order.id,
+    thresholds: th,
     zip: resolved.zip,
     place: placeLabel(dest),
     status: 'ok',
@@ -323,21 +389,22 @@ interface RecommendInput {
 
 function recommend(order: Order, ctx: DecideContext, input: RecommendInput): Recommendation {
   const s = ctx.settings
+  const th = thresholdsForOrder(order, s).thresholds
   const why = input.tooHot
-    ? `Worst case ${fmtTemp(input.worstHigh)} is at or above the ${s.thresholds.hold}°F hold threshold.`
+    ? `Worst case ${fmtTemp(input.worstHigh)} is at or above the ${th.hold}°F hold threshold.`
     : `${input.transitDays} days in transit at double-thermal temperatures is a long time on ice.`
 
   // Alternative 1: faster service.
   let expedite: { level: ServiceLevel; d: Decision } | null = null
   if (input.service === 'ground') {
     const alt = decide(order, ctx, { noAlternatives: true, serviceOverride: 'two_day' })
-    if (alt.status === 'ok' && alt.worst && (alt.worst.high! < s.thresholds.hold || TIER_RANK[alt.tier] < TIER_RANK[input.tier])) {
+    if (alt.status === 'ok' && alt.worst && (alt.worst.high! < th.hold || TIER_RANK[alt.tier] < TIER_RANK[input.tier])) {
       expedite = { level: 'two_day', d: alt }
     }
   }
 
   // Alternative 2: a cooler ship day in the next week.
-  const better = findBetterShipDate(order, ctx, input.tier, input.tooHot ? s.thresholds.hold : undefined)
+  const better = findBetterShipDate(order, ctx, input.tier, input.tooHot ? th.hold : undefined)
 
   const parts: string[] = [why]
   if (expedite) {
@@ -350,7 +417,7 @@ function recommend(order: Order, ctx: DecideContext, input: RecommendInput): Rec
     parts.push('No cooler option in the next 7 days — ship with maximum protection or call the customer.')
   }
 
-  const action: Recommendation['action'] = expedite && expedite.d.worst!.high! < s.thresholds.hold ? 'expedite' : better ? 'hold' : 'expedite'
+  const action: Recommendation['action'] = expedite && expedite.d.worst!.high! < th.hold ? 'expedite' : better ? 'hold' : 'expedite'
   return { action, detail: parts.join(' '), holdUntil: better?.shipDate }
 }
 
@@ -367,7 +434,7 @@ export function findBetterShipDate(
 ): Decision | null {
   for (let i = 1; i <= horizonDays; i++) {
     const candidate = addDays(ctx.shipDate, i)
-    const eff = effectiveShipDate(candidate)
+    const eff = effectiveShipDate(candidate, ctx.settings.observeHolidays)
     if (eff.date !== candidate) continue
     const d = decide(order, ctx, { noAlternatives: true, shipDateOverride: candidate })
     if (d.status !== 'ok' || !d.worst || d.confidence === 'low') continue

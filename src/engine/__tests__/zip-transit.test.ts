@@ -92,9 +92,9 @@ describe('estimateTransitDays', () => {
 
 describe('calendar math', () => {
   it('weekend ship dates move to Monday', () => {
-    expect(effectiveShipDate('2026-09-19')).toEqual({ date: '2026-09-21', shifted: true }) // Sat
-    expect(effectiveShipDate('2026-09-20')).toEqual({ date: '2026-09-21', shifted: true }) // Sun
-    expect(effectiveShipDate('2026-09-21')).toEqual({ date: '2026-09-21', shifted: false })
+    expect(effectiveShipDate('2026-09-19')).toMatchObject({ date: '2026-09-21', shifted: true }) // Sat
+    expect(effectiveShipDate('2026-09-20')).toMatchObject({ date: '2026-09-21', shifted: true }) // Sun
+    expect(effectiveShipDate('2026-09-21')).toMatchObject({ date: '2026-09-21', shifted: false })
   })
   it('Thursday + 3 ground days skips the weekend → Tuesday', () => {
     expect(deliveryDate('2026-09-17', 3, false)).toBe('2026-09-22')

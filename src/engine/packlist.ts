@@ -4,9 +4,11 @@
 import { materialsFor, TIER_RANK } from './decide'
 import type { Decision, Order, Settings, Tier } from './types'
 
+/** What the packer changed by hand on one line: the tier, a note, and how many boxes it ships as. */
 export interface Override {
-  tier: Tier
-  note: string
+  tier?: Tier
+  note?: string
+  boxes?: number
 }
 
 export interface PackLine {
@@ -19,23 +21,36 @@ export function effectiveTier(line: PackLine): Tier {
   return line.override?.tier ?? line.decision.tier
 }
 
+export function boxesFor(line: PackLine): number {
+  const b = line.override?.boxes
+  return b && b > 0 ? Math.round(b) : 1
+}
+
+/** True when the packer has actually changed the tier (a note or box count alone is not an override). */
+export function tierOverridden(line: PackLine): boolean {
+  return line.override?.tier !== undefined && line.override.tier !== line.decision.tier
+}
+
 export interface LineMaterials {
   liners: number
   icePacks: number
   cost: number
 }
 
-/** Materials for the tier actually being packed (override-aware). */
+/** Materials for the tier actually being packed, times the number of boxes. */
 export function lineMaterials(line: PackLine, settings: Settings): LineMaterials {
-  if (!line.override) {
-    return { liners: line.decision.liners, icePacks: line.decision.icePacks, cost: line.decision.cost }
-  }
-  const m = materialsFor(line.override.tier, line.decision.transitDays, settings)
-  return { liners: m.liners, icePacks: m.icePacks, cost: m.cost }
+  const boxes = boxesFor(line)
+  const tier = effectiveTier(line)
+  const m =
+    tier === line.decision.tier
+      ? { liners: line.decision.liners, icePacks: line.decision.icePacks, cost: line.decision.cost }
+      : materialsFor(tier, line.decision.transitDays, settings)
+  return { liners: m.liners * boxes, icePacks: m.icePacks * boxes, cost: Math.round(m.cost * boxes * 100) / 100 }
 }
 
 export interface PackSummary {
   orders: number
+  boxes: number
   byTier: Record<Tier, number>
   liners: number
   icePacks: number
@@ -49,6 +64,7 @@ export interface PackSummary {
 export function summarize(lines: PackLine[], settings: Settings, stale = false): PackSummary {
   const s: PackSummary = {
     orders: lines.length,
+    boxes: 0,
     byTier: { none: 0, single: 0, double: 0 },
     liners: 0,
     icePacks: 0,
@@ -62,12 +78,13 @@ export function summarize(lines: PackLine[], settings: Settings, stale = false):
     const tier = effectiveTier(line)
     const m = lineMaterials(line, settings)
     if (line.decision.status === 'ok') s.byTier[tier]++
+    s.boxes += boxesFor(line)
     s.liners += m.liners
     s.icePacks += m.icePacks
     s.cost += m.cost
     if (line.decision.status !== 'ok') s.needsReview++
     if (line.decision.recommendation) s.recommendations++
-    if (line.override) s.overrides++
+    if (tierOverridden(line)) s.overrides++
   }
   s.cost = Math.round(s.cost * 100) / 100
   return s

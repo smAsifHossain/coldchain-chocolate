@@ -3,7 +3,7 @@
 /** The three packaging tiers the shipping team chooses between. */
 export type Tier = 'none' | 'single' | 'double'
 
-export type ServiceLevel = 'ground' | 'two_day' | 'overnight'
+export type ServiceLevel = 'ground' | 'two_day' | 'overnight' | 'pickup'
 
 /** One shippable order. Only `zip` is required; the rest enriches the pack list. */
 export interface Order {
@@ -27,8 +27,22 @@ export interface ZoneRule {
   days: number
 }
 
+/** Products that soften sooner than a solid tempered bar lower the thresholds for their box. */
+export interface ProductRule {
+  label: string
+  /** Case-insensitive regular expression matched against line-item names. */
+  pattern: string
+  /** Degrees F added to every threshold for a box containing a match (negative = more careful). */
+  offset: number
+}
+
 export interface Settings {
   originZip: string
+  /** Carrier pickup time, HH:MM 24h. After this, "today" means the next business day. */
+  pickupCutoff: string
+  /** Skip the six major carrier holidays in the date math. */
+  observeHolidays: boolean
+  productRules: ProductRule[]
   /** Worst-case daily high (°F) at or above which each tier applies. */
   thresholds: {
     single: number
@@ -85,6 +99,7 @@ export interface LocationForecast {
   fetchedAt: number
   /** True when served from cache after a failed refresh. */
   stale: boolean
+  source?: 'open-meteo' | 'nws'
 }
 
 export type ExposureRole = 'origin' | 'route' | 'transit' | 'destination' | 'porch'
@@ -108,6 +123,8 @@ export interface Recommendation {
 
 export interface Decision {
   orderId: string
+  /** Thresholds after product rules, so the UI colors the trip the way it was judged. */
+  thresholds: { single: number; double: number; hold: number }
   zip: string
   place: string
   status: 'ok' | 'needs_review' | 'no_forecast'

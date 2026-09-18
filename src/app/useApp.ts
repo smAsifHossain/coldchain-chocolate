@@ -31,6 +31,28 @@ export const BASE_URL = import.meta.env.BASE_URL
 
 const SESSION_KEY = 'coldchain.session.v1'
 const OVERRIDES_KEY = 'coldchain.overrides.v1'
+const PACKED_KEY = 'coldchain.packed.v1'
+
+/**
+ * The first day a carrier can still pick up: today if it is before the cutoff,
+ * otherwise the next business day. Weekends and holidays roll forward too.
+ */
+export function nextShipDate(now: Date, settings: Settings): { date: string; afterCutoff: boolean } {
+  const [h, m] = settings.pickupCutoff.split(':').map(Number)
+  const cutoff = new Date(now)
+  cutoff.setHours(Number.isFinite(h) ? h : 15, Number.isFinite(m) ? m : 0, 0, 0)
+  const today = todayISO(now)
+  const todayIsCarrierDay = effectiveShipDate(today, settings.observeHolidays).date === today
+  const afterCutoff = todayIsCarrierDay && now.getTime() >= cutoff.getTime()
+  const date = effectiveShipDate(afterCutoff ? nextDay(today) : today, settings.observeHolidays).date
+  return { date, afterCutoff }
+}
+
+function nextDay(iso: string): string {
+  const [y, mo, d] = iso.split('-').map(Number)
+  const dt = new Date(y, mo - 1, d + 1)
+  return todayISO(dt)
+}
 
 export type Phase = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -42,6 +64,8 @@ export interface RunStatus {
   message: string | null
   /** Some forecasts came from an older cache because the refresh failed. */
   stale: boolean
+  /** Some forecasts came from the National Weather Service because Open-Meteo failed. */
+  fallback: boolean
   /** Locations with no forecast at all. */
   missing: number
   errors: string[]
@@ -81,14 +105,19 @@ export function overrideKey(shipDate: string, orderId: string): string {
 export function useApp() {
   const today = todayISO()
   const [settings, setSettingsState] = useState<Settings>(() => loadSettings())
-  const [session, setSession] = useState<Session>(() =>
-    readJson<Session>(SESSION_KEY, { orders: [], shipDate: effectiveShipDate(today).date, sourceLabel: '', includeFulfilled: false }),
-  )
+  const [session, setSession] = useState<Session>(() => {
+    const saved = readJson<Session | null>(SESSION_KEY, null)
+    const first = nextShipDate(new Date(), loadSettings()).date
+    // A saved ship date in the past is never what the bench wants this morning.
+    if (saved) return { ...saved, shipDate: saved.shipDate < today ? first : saved.shipDate }
+    return { orders: [], shipDate: first, sourceLabel: '', includeFulfilled: false }
+  })
+  const [packed, setPackedState] = useState<Record<string, boolean>>(() => readJson(PACKED_KEY, {}))
   const [overrides, setOverrides] = useState<Record<string, Override>>(() => readJson(OVERRIDES_KEY, {}))
   const [zipDb, setZipDb] = useState<ZipDb | null>(null)
   const [zipError, setZipError] = useState<string | null>(null)
   const [ctx, setCtx] = useState<DecideContext | null>(null)
-  const [run, setRun] = useState<RunStatus>({ phase: 'idle', message: null, stale: false, missing: 0, errors: [], ranAt: null })
+  const [run, setRun] = useState<RunStatus>({ phase: 'idle', message: null, stale: false, fallback: false, missing: 0, errors: [], ranAt: null })
   const [step, setStep] = useState<BuildStep>(null)
   const cache = useRef(sharedForecastCache())
   const runId = useRef(0)
@@ -101,6 +130,9 @@ export function useApp() {
 
   useEffect(() => writeJson(SESSION_KEY, session), [session])
   useEffect(() => writeJson(OVERRIDES_KEY, overrides), [overrides])
+  useEffect(() => writeJson(PACKED_KEY, packed), [packed])
+
+  const cutoff = useMemo(() => nextShipDate(new Date(), settings), [settings])
 
   const setSettings = useCallback((next: Settings) => {
     setSettingsState(next)
@@ -117,7 +149,7 @@ export function useApp() {
   const setOrders = useCallback((orders: Order[], sourceLabel: string) => {
     setSession((s) => ({ ...s, orders, sourceLabel }))
     setCtx(null)
-    setRun({ phase: 'idle', message: null, stale: false, missing: 0, errors: [], ranAt: null })
+    setRun({ phase: 'idle', message: null, stale: false, fallback: false, missing: 0, errors: [], ranAt: null })
   }, [])
 
   const setShipDate = useCallback((shipDate: string) => {
@@ -180,14 +212,17 @@ export function useApp() {
     setCtx(next)
     const message =
       fetched.missing.length > 0 && fetched.forecasts.size === 0
-        ? 'The forecast service could not be reached and nothing is cached. Decisions default to the safest tier — check the weather by hand.'
+        ? 'Neither forecast service could be reached and nothing is cached. Decisions default to the safest tier — check the weather by hand.'
         : fetched.stale.length > 0
-          ? 'The forecast service could not be reached. Showing the last saved forecast — re-run when you are back online.'
-          : null
+          ? 'The forecast services could not be reached. Showing the last saved forecast — re-run when you are back online.'
+          : fetched.fallback.length > 0
+            ? 'Open-Meteo was unreachable, so these forecasts come from the National Weather Service (7 days instead of 16).'
+            : null
     setRun({
       phase: fetched.forecasts.size === 0 && points.length > 0 ? 'error' : 'ready',
       message,
       stale: fetched.stale.length > 0,
+      fallback: fetched.fallback.length > 0,
       missing: fetched.missing.length,
       errors: fetched.errors,
       ranAt: Date.now(),
@@ -238,10 +273,26 @@ export function useApp() {
     setOverrides((o) => {
       const key = overrideKey(session.shipDate, orderId)
       const next = { ...o }
-      if (override) next[key] = override
+      const clean = override && (override.tier !== undefined || override.boxes !== undefined || override.note) ? override : null
+      if (clean) next[key] = clean
       else delete next[key]
       return next
     })
+  }, [session.shipDate])
+
+  /** Ticks on the pack list survive a refresh; keyed by ship date so tomorrow starts clean. */
+  const isPacked = useCallback((orderId: string) => !!packed[overrideKey(session.shipDate, orderId)], [packed, session.shipDate])
+  const setPacked = useCallback((orderId: string, value: boolean) => {
+    setPackedState((p) => {
+      const key = overrideKey(session.shipDate, orderId)
+      const next = { ...p }
+      if (value) next[key] = true
+      else delete next[key]
+      return next
+    })
+  }, [session.shipDate])
+  const clearPacked = useCallback(() => {
+    setPackedState((p) => Object.fromEntries(Object.entries(p).filter(([k]) => !k.startsWith(session.shipDate + '|'))))
   }, [session.shipDate])
 
   /** True when a settings change means the forecast set no longer covers every point. */
@@ -261,6 +312,10 @@ export function useApp() {
     setIncludeFulfilled,
     shipDate: session.shipDate,
     setShipDate,
+    cutoff,
+    isPacked,
+    setPacked,
+    clearPacked,
     zipDb,
     zipError,
     origin,

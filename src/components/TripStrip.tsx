@@ -1,7 +1,7 @@
-import { formatShort, type Decision, type Settings } from '../engine'
+import { formatShort, type Decision } from '../engine'
 
 /** One colored cell per day of the trip; the hottest day is outlined. Reads at a glance in a table row. */
-export function TripStrip({ decision: d, settings }: { decision: Decision; settings: Settings }) {
+export function TripStrip({ decision: d }: { decision: Decision }) {
   if (d.window.length === 0) return null
   const byDate = new Map<string, { high: number | null; place: string }>()
   for (const p of d.window) {
@@ -9,7 +9,7 @@ export function TripStrip({ decision: d, settings }: { decision: Decision; setti
     if (!cur || (p.high !== null && (cur.high === null || p.high > cur.high))) byDate.set(p.date, { high: p.high, place: p.place })
   }
   const cells = [...byDate.entries()]
-  const t = settings.thresholds
+  const t = d.thresholds
   return (
     <span className="strip" aria-label="Daily highs along the trip">
       {cells.map(([date, c]) => {
