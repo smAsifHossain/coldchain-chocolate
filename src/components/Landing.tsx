@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { dayAt, formatShort, getForecasts, pointKey, sharedForecastCache, type DailyForecast } from '../engine'
+import { useEffect, useMemo, useState } from 'react'
+import { dayAt, formatShort, getForecasts, lookupZip, pointKey, sharedForecastCache, type DailyForecast, type Place } from '../engine'
 import type { AppApi } from '../app/useApp'
 import { Simulation } from './Simulation'
 
@@ -21,20 +21,55 @@ export function Landing({ app, onOpenPlanner, onDemo, onAbout }: Props) {
   )
 }
 
+/** Destinations the headline and thermometer cycle through: where Cocoa Dolce's boxes actually go. */
+const CITIES: { zip: string; name: string }[] = [
+  { zip: '67206', name: 'Wichita' },
+  { zip: '75201', name: 'Dallas' },
+  { zip: '78701', name: 'Austin' },
+  { zip: '10001', name: 'New York' },
+  { zip: '60606', name: 'Chicago' },
+  { zip: '85004', name: 'Phoenix' },
+  { zip: '33131', name: 'Miami' },
+  { zip: '80203', name: 'Denver' },
+  { zip: '98101', name: 'Seattle' },
+  { zip: '30308', name: 'Atlanta' },
+]
+
+const CYCLE_MS = 2600
+
 function Hero({ app, onOpenPlanner, onDemo }: Pick<Props, 'app' | 'onOpenPlanner' | 'onDemo'>) {
-  const [todayAtOrigin, setTodayAtOrigin] = useState<DailyForecast | null>(null)
+  const [highs, setHighs] = useState<Map<string, DailyForecast | null>>(new Map())
+  const [idx, setIdx] = useState(0)
   const [busy, setBusy] = useState(false)
 
+  const places = useMemo<Place[]>(() => (app.zipDb ? CITIES.map((c) => lookupZip(app.zipDb!, c.zip)).filter((p): p is Place => !!p) : []), [app.zipDb])
+
+  // One request for every city; the shared cache means the simulation below reuses it.
   useEffect(() => {
+    if (places.length === 0) return
     let cancelled = false
-    getForecasts([app.origin], { cache: sharedForecastCache() }).then((r) => {
+    getForecasts(places, { cache: sharedForecastCache() }).then((r) => {
       if (cancelled) return
-      setTodayAtOrigin(dayAt(r.forecasts.get(pointKey(app.origin)), app.today))
+      const next = new Map<string, DailyForecast | null>()
+      for (const p of places) next.set(p.zip, dayAt(r.forecasts.get(pointKey(p)), app.today))
+      setHighs(next)
     })
     return () => {
       cancelled = true
     }
-  }, [app.origin, app.today])
+  }, [places, app.today])
+
+  // Cycle the city; hold still for people who asked for reduced motion.
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || places.length === 0) return
+    const id = window.setInterval(() => setIdx((i) => (i + 1) % places.length), CYCLE_MS)
+    return () => window.clearInterval(id)
+  }, [places.length])
+
+  const current = places[idx] ?? null
+  const day = current ? (highs.get(current.zip) ?? null) : null
+  const th = app.settings.thresholds
+  const cityColor = day === null ? 'var(--color-ink)' : day.high >= th.double ? 'var(--color-hot)' : day.high >= th.single ? 'var(--color-foil)' : 'var(--color-cold)'
 
   const demo = async () => {
     setBusy(true)
@@ -48,10 +83,18 @@ function Hero({ app, onOpenPlanner, onDemo }: Pick<Props, 'app' | 'onOpenPlanner
   return (
     <section className="mx-auto w-full max-w-7xl px-4 md:px-6 pt-10 pb-12 md:pt-16 md:pb-16 grid gap-10 lg:grid-cols-[3fr_2fr] lg:items-center" aria-label="Introduction">
       <div className="flex flex-col gap-6">
-        <h1 className="display text-4xl md:text-6xl max-w-[16ch]">Know if the chocolate will melt before the box leaves {app.origin.city}.</h1>
+        <h1 className="display text-4xl md:text-6xl max-w-[16ch]">
+          Know if the chocolate will melt on the way to{' '}
+          <span className="whitespace-nowrap">
+            <span className="city-swap" key={current?.zip ?? 'none'} aria-live="polite" style={{ color: cityColor }}>
+              {current?.city ?? 'anywhere'}
+            </span>
+            .
+          </span>
+        </h1>
         <p className="text-lg text-ink-soft max-w-prose">
-          ColdChain reads the day's Shopify orders, checks the forecast along every route, and tells the packing bench exactly what to pull for each box: no thermal,
-          a single liner, or double thermal with ice packs. One wrong call melts product; this makes the call for every order in seconds.
+          ColdChain reads the day's Shopify orders, checks the forecast along every route out of {app.origin.city}, and tells the packing bench exactly what to pull
+          for each box: no thermal, a single liner, or double thermal with ice packs. One wrong call melts product; this makes the call for every order in seconds.
         </p>
         <div className="flex flex-wrap gap-3">
           <button className="btn btn-primary text-base" onClick={onOpenPlanner}>
@@ -63,13 +106,37 @@ function Hero({ app, onOpenPlanner, onDemo }: Pick<Props, 'app' | 'onOpenPlanner
         </div>
         <p className="text-ink-faint text-sm">No account, nothing to install. Forecasts are live; nothing about the orders leaves this browser.</p>
       </div>
-      <Thermometer high={todayAtOrigin?.high ?? null} date={app.today} place={`${app.origin.city}, ${app.origin.state}`} thresholds={app.settings.thresholds} />
+      <Thermometer
+        high={day?.high ?? null}
+        date={app.today}
+        place={current ? `${current.city}, ${current.state}` : ''}
+        thresholds={app.settings.thresholds}
+        cities={places.map((p) => p.city)}
+        active={idx}
+        onPick={setIdx}
+      />
     </section>
   )
 }
 
 /** Today's high at the origin against the three thresholds — the whole tool in one glance. */
-function Thermometer({ high, date, place, thresholds }: { high: number | null; date: string; place: string; thresholds: { single: number; double: number; hold: number } }) {
+function Thermometer({
+  high,
+  date,
+  place,
+  thresholds,
+  cities,
+  active,
+  onPick,
+}: {
+  high: number | null
+  date: string
+  place: string
+  thresholds: { single: number; double: number; hold: number }
+  cities: string[]
+  active: number
+  onPick: (i: number) => void
+}) {
   const MIN = 30
   const MAX = 110
   const H = 260
@@ -77,11 +144,12 @@ function Thermometer({ high, date, place, thresholds }: { high: number | null; d
   const y = (t: number) => TOP + ((MAX - Math.max(MIN, Math.min(MAX, t))) / (MAX - MIN)) * H
   const fillTop = high === null ? TOP + H : y(high)
   const tier = high === null ? null : high >= thresholds.double ? 'double' : high >= thresholds.single ? 'single' : 'none'
-  const color = tier === 'double' ? '#b3311f' : tier === 'single' ? '#a8720e' : '#3b5f7a'
+  const color = tier === 'double' ? '#b3311f' : tier === 'single' ? '#a8720e' : tier === 'none' ? '#3b5f7a' : '#b9b0a4'
   const label = tier === 'double' ? 'double thermal weather' : tier === 'single' ? 'single thermal weather' : tier === 'none' ? 'no thermal needed' : 'fetching the forecast'
 
   return (
-    <figure className="sheet p-6 flex items-center gap-6 justify-center" aria-label={`${place} high today`}>
+    <figure className="sheet p-6 flex flex-col items-center gap-4" aria-label={`${place} high today`}>
+      <div className="flex items-center gap-6 justify-center">
       <svg width="210" height={H + 70} viewBox={`0 0 210 ${H + 70}`} role="img" aria-label={high === null ? 'Thermometer loading' : `${Math.round(high)} degrees today`}>
         <title>{place} high today</title>
         {/* scale on the right */}
@@ -115,18 +183,34 @@ function Thermometer({ high, date, place, thresholds }: { high: number | null; d
           height={H + 4}
           rx="6"
           fill={color}
-          style={{ transformOrigin: `120px ${TOP + H + 4}px`, transform: `scaleY(${(TOP + H + 4 - fillTop) / (H + 4)})` }}
+          style={{ transformOrigin: `120px ${TOP + H + 4}px`, transform: `scaleY(${(TOP + H + 4 - fillTop) / (H + 4)})`, transition: 'transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1), fill 500ms ease' }}
         />
-        <circle cx="120" cy={TOP + H + 22} r="18" fill={color} stroke="#f4f2ee" strokeWidth="3" />
+        <circle cx="120" cy={TOP + H + 22} r="18" fill={color} stroke="#f4f2ee" strokeWidth="3" style={{ transition: 'fill 500ms ease' }} />
         <circle cx="120" cy={TOP + H + 22} r="21" fill="none" stroke="#b9b0a4" strokeWidth="1.5" />
       </svg>
-      <figcaption className="flex flex-col gap-1">
-        <div className="text-ink-soft text-sm">{place}, {formatShort(date)}</div>
-        <div className="display text-5xl" style={{ color }}>
+      <figcaption className="flex flex-col gap-1 min-w-[12rem]" key={place}>
+        <div className="text-ink-soft text-sm fade-in">{place ? `${place}, ${formatShort(date)}` : formatShort(date)}</div>
+        <div className="display text-5xl fade-in" style={{ color, transition: 'color 500ms ease' }}>
           {high === null ? '—' : `${Math.round(high)}°F`}
         </div>
-        <div className="text-sm text-ink-soft">{label}</div>
+        <div className="text-sm text-ink-soft fade-in">{label}</div>
       </figcaption>
+      </div>
+      {cities.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-1.5" role="tablist" aria-label="City">
+          {cities.map((c, i) => (
+            <button
+              key={c}
+              role="tab"
+              aria-selected={i === active}
+              className={`city-dot ${i === active ? 'is-active' : ''}`}
+              onClick={() => onPick(i)}
+              aria-label={c}
+              title={c}
+            />
+          ))}
+        </div>
+      )}
     </figure>
   )
 }
