@@ -85,8 +85,8 @@ function Group({ title, lines, app, tone }: { title: string; lines: PackLine[]; 
               <span className="sr-only">Done</span>
             </th>
             <th scope="col">Order</th>
-            <th scope="col">Ship to</th>
-            <th scope="col">Service</th>
+            <th scope="col">Destination</th>
+            <th scope="col">Shipping method</th>
             <th scope="col">Pull</th>
             <th scope="col">Worst case</th>
             <th scope="col">Notes</th>
@@ -117,8 +117,11 @@ function Group({ title, lines, app, tone }: { title: string; lines: PackLine[]; 
                   <div className="text-ink-soft text-sm">{d.zip}</div>
                 </td>
                 <td>
-                  <div>{SERVICE_LABEL[d.serviceLevel]}</div>
-                  {d.status === 'ok' && <div className="text-ink-soft text-sm">arrives {formatShort(d.deliveryDate)}</div>}
+                  <div>{line.order.shippingMethod || SERVICE_LABEL[d.serviceLevel]}</div>
+                  <div className="text-ink-soft text-sm">
+                    {SERVICE_LABEL[d.serviceLevel]}
+                    {d.status === 'ok' ? `, arrives ${formatShort(d.deliveryDate)}` : ''}
+                  </div>
                 </td>
                 <td className="whitespace-nowrap">
                   <TierStamp tier={effectiveTier(line)} status={d.status} />

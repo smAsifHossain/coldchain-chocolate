@@ -1,5 +1,5 @@
-// Turns what the shipping team has on hand — a Shopify order export, any CSV
-// with a zip column, or a pasted list — into Orders.
+// Turns what the shipping team has on hand — a Shopify order export or any
+// CSV with a zip column — into Orders.
 
 import Papa from 'papaparse'
 import { parseServiceLevel } from './transit'
@@ -8,7 +8,7 @@ import type { Order } from './types'
 export interface ImportResult {
   orders: Order[]
   /** Which parser handled the input. */
-  source: 'shopify' | 'csv' | 'list'
+  source: 'shopify' | 'csv'
   skipped: { fulfilled: number; noZip: number }
   columns: string[]
 }
@@ -117,39 +117,3 @@ export function parseCsv(text: string, options: { includeFulfilled?: boolean } =
   return { ...result, columns }
 }
 
-/**
- * Pasted text: one entry per line. Accepts "85004", "85004, 3", "85004 x3",
- * "#1042 85004", or "85004 2-Day". Order ids are generated when absent.
- */
-export function parseList(text: string): ImportResult {
-  const orders: Order[] = []
-  let n = 0
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim()
-    if (!line) continue
-    const tokens = line.split(/[\s,;]+/).filter(Boolean)
-    const zipIdx = tokens.findIndex((t) => /^'?\d{3,5}(-\d{4})?$/.test(t))
-    if (zipIdx === -1) continue
-    n++
-    const zip = tokens[zipIdx]
-    const rest = tokens.filter((_, i) => i !== zipIdx)
-    const idTok = rest.find((t) => /^#\w+/.test(t))
-    const qtyTok = rest.find((t) => /^x?\d{1,3}$/i.test(t))
-    const method = rest.filter((t) => t !== idTok && t !== qtyTok).join(' ')
-    orders.push({
-      id: idTok ?? `Zip ${n}`,
-      zip,
-      qty: qtyTok ? Number(qtyTok.replace(/^x/i, '')) : 1,
-      shippingMethod: method || undefined,
-      serviceLevel: parseServiceLevel(method),
-    })
-  }
-  return { orders, source: 'list', skipped: { fulfilled: 0, noZip: 0 }, columns: [] }
-}
-
-/** Detects CSV vs. a plain list and parses accordingly. */
-export function parseInput(text: string, options: { includeFulfilled?: boolean } = {}): ImportResult {
-  const firstLine = text.split(/\r?\n/).find((l) => l.trim() !== '') ?? ''
-  const looksLikeCsv = /,/.test(firstLine) && /[A-Za-z]{3,}/.test(firstLine)
-  return looksLikeCsv ? parseCsv(text, options) : parseList(text)
-}

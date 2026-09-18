@@ -230,3 +230,171 @@ table.bench tr:last-child td {
     break-inside: avoid;
   }
 }
+
+/* ---------- Motion: one orchestrated moment when a pack list lands ---------- */
+
+.row-in {
+  opacity: 1;
+  translate: 0 0;
+  transition:
+    opacity 320ms ease-out,
+    translate 320ms ease-out;
+  transition-delay: var(--stagger, 0ms);
+}
+@starting-style {
+  .row-in {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+.stamp-in {
+  scale: 1;
+  opacity: 1;
+  transition:
+    scale 260ms cubic-bezier(0.2, 1.4, 0.4, 1),
+    opacity 200ms ease-out;
+  transition-delay: var(--stagger, 0ms);
+}
+@starting-style {
+  .stamp-in {
+    scale: 1.6;
+    opacity: 0;
+  }
+}
+
+.fade-in {
+  opacity: 1;
+  transition: opacity 400ms ease-out;
+}
+@starting-style {
+  .fade-in {
+    opacity: 0;
+  }
+}
+
+/* ---------- Thermal display (dark section on the landing page) ---------- */
+
+.thermal {
+  background: var(--color-cocoa-deep);
+  color: var(--color-stone);
+}
+.thermal .muted {
+  color: rgba(244, 242, 238, 0.62);
+}
+.thermal .faint {
+  color: rgba(244, 242, 238, 0.4);
+}
+.thermal .btn {
+  background: transparent;
+  color: var(--color-stone);
+  border-color: rgba(244, 242, 238, 0.35);
+}
+.thermal .btn:hover {
+  background: rgba(244, 242, 238, 0.08);
+}
+.thermal .btn[aria-pressed='true'] {
+  background: var(--color-stone);
+  color: var(--color-cocoa-deep);
+  border-color: var(--color-stone);
+}
+.thermal .field {
+  background: rgba(244, 242, 238, 0.06);
+  color: var(--color-stone);
+  border-color: rgba(244, 242, 238, 0.3);
+}
+.thermal .field::placeholder {
+  color: rgba(244, 242, 238, 0.4);
+}
+
+.bar {
+  width: 100%;
+  border-radius: 4px 4px 2px 2px;
+  height: var(--h, 0%);
+  transition: height 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  background: var(--bar, #7fa7c4);
+}
+.bar-none {
+  --bar: #7fa7c4;
+}
+.bar-single {
+  --bar: #e0a93a;
+}
+.bar-double {
+  --bar: #e24b2a;
+}
+.bar-missing {
+  --bar: rgba(244, 242, 238, 0.15);
+}
+
+.day-col {
+  transition: opacity 300ms ease-out;
+}
+.day-col[data-lit='false'] {
+  opacity: 0.28;
+}
+.day-col[data-worst='true'] .bar {
+  box-shadow: 0 0 0 3px var(--color-cocoa-deep), 0 0 0 5px var(--bar);
+}
+
+.box-glyph {
+  transition: left 480ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tube-fill {
+  transition: transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ---------- Trip strip inside a table row ---------- */
+
+.strip {
+  display: inline-flex;
+  gap: 2px;
+}
+.strip span {
+  display: inline-block;
+  width: 14px;
+  height: 22px;
+  border-radius: 3px;
+}
+.strip .s-none {
+  background: var(--color-cold);
+  opacity: 0.55;
+}
+.strip .s-single {
+  background: var(--color-foil);
+}
+.strip .s-double {
+  background: var(--color-hot);
+}
+.strip .s-missing {
+  background: var(--color-line);
+}
+.strip .s-worst {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 1px;
+}
+
+/* ---------- Planner heat map ---------- */
+
+.heat-none {
+  background: var(--color-cold-bg);
+}
+.heat-single {
+  background: var(--color-foil-bg);
+}
+.heat-double {
+  background: var(--color-hot-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row-in,
+  .stamp-in,
+  .fade-in,
+  .bar,
+  .box-glyph,
+  .tube-fill,
+  .day-col {
+    transition: none !important;
+  }
+}

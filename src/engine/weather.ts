@@ -184,6 +184,14 @@ export function createLocalCache(storageKey = 'coldchain.forecast.v1'): Forecast
   }
 }
 
+let shared: ForecastCache | null = null
+
+/** The one localStorage-backed cache every part of the app shares. */
+export function sharedForecastCache(): ForecastCache {
+  if (!shared) shared = createLocalCache()
+  return shared
+}
+
 export function createMemoryCache(): ForecastCache {
   const mem = new Map<string, LocationForecast>()
   return { get: (k) => mem.get(k), set: (k, v) => void mem.set(k, v) }

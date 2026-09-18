@@ -69,11 +69,15 @@ export function PlannerView({ app }: { app: AppApi }) {
                     <div>{order.id}</div>
                     <div className="text-ink-soft text-sm font-normal">{days[0].decision.place || order.zip}</div>
                   </th>
-                  {days.map(({ shipDate, decision }, i) => (
-                    <td key={shipDate} className={`text-center ${i === bestIdx ? 'bg-cold-bg/60' : ''}`}>
-                      <Cell decision={decision} weekend={isWeekend(shipDate)} best={i === best} />
-                    </td>
-                  ))}
+                  {days.map(({ shipDate, decision }, i) => {
+                    const weekend = isWeekend(shipDate)
+                    const heat = weekend || decision.status !== 'ok' ? '' : `heat-${decision.tier}`
+                    return (
+                      <td key={shipDate} className={`text-center ${heat} ${i === bestIdx ? 'outline outline-2 -outline-offset-2 outline-cold' : ''}`}>
+                        <Cell decision={decision} weekend={weekend} best={i === best} />
+                      </td>
+                    )
+                  })}
                 </tr>
               )
             })}
@@ -122,7 +126,7 @@ function Cell({ decision, weekend, best }: { decision: Decision; weekend: boolea
   const tier: Tier = decision.tier
   const cls = tier === 'double' ? 'text-hot' : tier === 'single' ? 'text-foil' : 'text-cold'
   return (
-    <div className={`${cls} ${best ? 'font-extrabold' : ''}`}>
+    <div className={`${cls} ${best ? 'font-extrabold underline decoration-2 underline-offset-4' : ''}`} title={best ? 'Coolest day for this order' : undefined}>
       <div className="text-lg leading-none">{Math.round(decision.worst.high!)}°</div>
       <div className="text-xs">{tier === 'double' ? 'double + ice' : tier === 'single' ? 'single' : 'none'}</div>
     </div>

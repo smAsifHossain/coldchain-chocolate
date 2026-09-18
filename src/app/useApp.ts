@@ -4,16 +4,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  createLocalCache,
   decide,
   effectiveShipDate,
   getForecasts,
   loadSettings,
   loadZipDb,
   lookupZip,
-  parseInput,
+  parseCsv,
   pointsForOrder,
   saveSettings,
+  sharedForecastCache,
   todayISO,
   validateSettings,
   type DecideContext,
@@ -33,6 +33,9 @@ const SESSION_KEY = 'coldchain.session.v1'
 const OVERRIDES_KEY = 'coldchain.overrides.v1'
 
 export type Phase = 'idle' | 'loading' | 'ready' | 'error'
+
+/** Which stage of a build is running, for the progress stepper. */
+export type BuildStep = 'locating' | 'forecasting' | 'deciding' | null
 
 export interface RunStatus {
   phase: Phase
@@ -86,7 +89,8 @@ export function useApp() {
   const [zipError, setZipError] = useState<string | null>(null)
   const [ctx, setCtx] = useState<DecideContext | null>(null)
   const [run, setRun] = useState<RunStatus>({ phase: 'idle', message: null, stale: false, missing: 0, errors: [], ranAt: null })
-  const cache = useRef(createLocalCache())
+  const [step, setStep] = useState<BuildStep>(null)
+  const cache = useRef(sharedForecastCache())
   const runId = useRef(0)
 
   useEffect(() => {
@@ -124,13 +128,14 @@ export function useApp() {
     setSession((s) => ({ ...s, includeFulfilled }))
   }, [])
 
+  /** Every order in the file is kept; the "already shipped" checkbox filters live. */
   const importText = useCallback(
     (text: string, label: string): ImportResult => {
-      const result = parseInput(text, { includeFulfilled: session.includeFulfilled })
+      const result = parseCsv(text, { includeFulfilled: true })
       setOrders(result.orders, label)
       return result
     },
-    [session.includeFulfilled, setOrders],
+    [setOrders],
   )
 
   const loadSample = useCallback(async (): Promise<ImportResult> => {
@@ -141,15 +146,29 @@ export function useApp() {
 
   const clearOrders = useCallback(() => setOrders([], ''), [setOrders])
 
-  const build = useCallback(async () => {
+  /**
+   * Fetch forecasts for every point the orders need and freeze them as the
+   * decision context. `ordersOverride` lets a caller build right after an
+   * import, before React state has caught up.
+   */
+  const build = useCallback(async (ordersOverride?: Order[]) => {
     if (!zipDb) return
     const id = ++runId.current
-    setRun((r) => ({ ...r, phase: 'loading', message: 'Fetching forecasts…', errors: [] }))
+    const list = ordersOverride ?? session.orders
+    setStep('locating')
+    setRun((r) => ({ ...r, phase: 'loading', message: null, errors: [] }))
     const partial: Pick<DecideContext, 'settings' | 'origin' | 'zipDb'> = { settings, origin, zipDb }
     const points: GeoPoint[] = []
-    for (const o of session.orders) points.push(...pointsForOrder(o, partial))
+    for (const o of list) points.push(...pointsForOrder(o, partial))
+    await new Promise((r) => setTimeout(r, 250))
+    if (id !== runId.current) return
+    setStep('forecasting')
     const fetched = await getForecasts(points, { cache: cache.current })
     if (id !== runId.current) return
+    setStep('deciding')
+    await new Promise((r) => setTimeout(r, 250))
+    if (id !== runId.current) return
+    setStep(null)
     const next: DecideContext = {
       settings,
       origin,
@@ -175,6 +194,21 @@ export function useApp() {
     })
   }, [zipDb, settings, origin, session.orders, session.shipDate])
 
+  /** One click for a judge: load the sample orders and build the pack list. */
+  const runDemo = useCallback(async () => {
+    const result = await loadSample()
+    await build(result.orders)
+  }, [loadSample, build])
+
+  // On a refresh with orders still loaded, rebuild from the forecast cache so the
+  // pack list is never lost to a reload.
+  const autoBuilt = useRef(false)
+  useEffect(() => {
+    if (autoBuilt.current || !zipDb || session.orders.length === 0 || ctx) return
+    autoBuilt.current = true
+    void build()
+  }, [zipDb, session.orders.length, ctx, build])
+
   /**
    * Decisions follow the current settings and ship date immediately; only the
    * forecasts are frozen at build time (a new origin or waypoint needs a re-fetch).
@@ -184,14 +218,21 @@ export function useApp() {
     return { ...ctx, settings, origin, shipDate: session.shipDate, today: todayISO() }
   }, [ctx, settings, origin, session.shipDate])
 
+  /** Orders on the bench today: everything in the file minus what already shipped (unless asked for). */
+  const orders = useMemo<Order[]>(
+    () => (session.includeFulfilled ? session.orders : session.orders.filter((o) => !o.fulfilled)),
+    [session.orders, session.includeFulfilled],
+  )
+  const shippedCount = useMemo(() => session.orders.filter((o) => o.fulfilled).length, [session.orders])
+
   const lines = useMemo<PackLine[]>(() => {
     if (!liveCtx) return []
-    return session.orders.map((order) => ({
+    return orders.map((order) => ({
       order,
       decision: decide(order, liveCtx),
       override: overrides[overrideKey(liveCtx.shipDate, order.id)],
     }))
-  }, [liveCtx, session.orders, overrides])
+  }, [liveCtx, orders, overrides])
 
   const setOverride = useCallback((orderId: string, override: Override | null) => {
     setOverrides((o) => {
@@ -212,7 +253,9 @@ export function useApp() {
     settings,
     setSettings,
     settingsProblems,
-    orders: session.orders,
+    orders,
+    allOrders: session.orders,
+    shippedCount,
     sourceLabel: session.sourceLabel,
     includeFulfilled: session.includeFulfilled,
     setIncludeFulfilled,
@@ -224,8 +267,10 @@ export function useApp() {
     ctx: liveCtx,
     lines,
     run,
+    step,
     needsRefetch,
     build,
+    runDemo,
     importText,
     loadSample,
     clearOrders,

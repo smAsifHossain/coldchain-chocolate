@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { dayAt, formatLong, pointKey, summarize, type DecideContext, type PackLine, type Settings } from '../engine'
 import type { RunStatus } from '../app/useApp'
 
@@ -31,10 +32,7 @@ export function DayStrip({ shipDate, ctx, lines, settings, run }: Props) {
         </div>
         {summary && (
           <>
-            <div>
-              <div className="text-ink-soft text-sm">Orders</div>
-              <div className="display text-2xl md:text-3xl">{summary.orders}</div>
-            </div>
+            <Count label="Orders" n={summary.orders} cls="" />
             <div className="flex gap-6">
               <Count label="No thermal" n={summary.byTier.none} cls="text-cold" />
               <Count label="Single" n={summary.byTier.single} cls="text-foil" />
@@ -55,11 +53,47 @@ export function DayStrip({ shipDate, ctx, lines, settings, run }: Props) {
   )
 }
 
+/** Counts from the previous value to the new one over ~400ms; respects reduced motion. */
+function useCountUp(target: number): number {
+  const [value, setValue] = useState(0)
+  const from = useRef(0)
+  useEffect(() => {
+    const start = from.current
+    if (start === target) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      from.current = target
+      setValue(target)
+      return
+    }
+    const t0 = performance.now()
+    let raf = 0
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - t0) / 400)
+      const eased = 1 - (1 - k) * (1 - k)
+      setValue(Math.round(start + (target - start) * eased))
+      if (k < 1) raf = requestAnimationFrame(tick)
+      else from.current = target
+    }
+    raf = requestAnimationFrame(tick)
+    // Background tabs pause animation frames; make sure the final number lands anyway.
+    const safety = window.setTimeout(() => {
+      from.current = target
+      setValue(target)
+    }, 450)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.clearTimeout(safety)
+    }
+  }, [target])
+  return value
+}
+
 function Count({ label, n, cls }: { label: string; n: number; cls: string }) {
+  const shown = useCountUp(n)
   return (
     <div>
       <div className="text-ink-soft text-sm">{label}</div>
-      <div className={`display text-2xl md:text-3xl ${cls}`}>{n}</div>
+      <div className={`display text-2xl md:text-3xl ${cls}`}>{shown}</div>
     </div>
   )
 }

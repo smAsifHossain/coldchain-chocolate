@@ -15,6 +15,8 @@ import {
 } from '../engine'
 import type { AppApi } from '../app/useApp'
 import { TierStamp } from './TierStamp'
+import { TripStrip } from './TripStrip'
+import type { BuildStep } from '../app/useApp'
 
 export function OrdersView({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => void }) {
   return (
@@ -25,29 +27,29 @@ export function OrdersView({ app, onGoToPackList }: { app: AppApi; onGoToPackLis
   )
 }
 
-function describeImport(r: ImportResult): string {
-  const n = r.orders.length
-  const what = r.source === 'shopify' ? 'Shopify export' : r.source === 'csv' ? 'CSV' : 'list'
-  const parts = [`${n} order${n === 1 ? '' : 's'} from the ${what}`]
-  if (r.skipped.fulfilled) parts.push(`${r.skipped.fulfilled} already fulfilled, skipped`)
-  if (r.skipped.noZip) parts.push(`${r.skipped.noZip} without a zip`)
-  return parts.join(' — ')
+/** What is on the bench right now — recomputed from state, so the checkbox and filters read true. */
+function StatusLine({ app }: { app: AppApi }) {
+  if (app.allOrders.length === 0) return null
+  const n = app.orders.length
+  const parts = [`${n} order${n === 1 ? '' : 's'}${app.sourceLabel ? ` from ${app.sourceLabel}` : ''}`]
+  if (app.shippedCount > 0) {
+    parts.push(`${app.shippedCount} already shipped, ${app.includeFulfilled ? 'included' : 'hidden'}`)
+  }
+  const noZip = app.orders.filter((o) => !o.zip).length
+  if (noZip > 0) parts.push(`${noZip} without a zip`)
+  return (
+    <p className="text-sm" role="status">
+      {parts.join(' — ')}
+    </p>
+  )
 }
 
 function InputDock({ app }: { app: AppApi }) {
-  const [text, setText] = useState('')
-  const [note, setNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const finish = (r: ImportResult) => {
-    setError(null)
-    setNote(describeImport(r))
-  }
-  const fail = (e: unknown) => {
-    setNote(null)
-    setError(e instanceof Error ? e.message : String(e))
-  }
+  const finish = (_r: ImportResult) => setError(null)
+  const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -58,16 +60,6 @@ function InputDock({ app }: { app: AppApi }) {
       fail(err)
     } finally {
       e.target.value = ''
-    }
-  }
-
-  const onPaste = () => {
-    if (!text.trim()) return
-    try {
-      finish(app.importText(text, 'Pasted list'))
-      setText('')
-    } catch (err) {
-      fail(err)
     }
   }
 
@@ -86,7 +78,7 @@ function InputDock({ app }: { app: AppApi }) {
     <aside className="sheet p-5 flex flex-col gap-5 no-print" aria-label="Orders in">
       <div>
         <h2 className="display text-lg mb-1">Today's orders</h2>
-        <p className="text-ink-soft text-sm">Upload the Shopify order export, or paste zip codes one per line.</p>
+        <p className="text-ink-soft text-sm">Upload the Shopify order export, or any CSV with a zip column.</p>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -94,38 +86,19 @@ function InputDock({ app }: { app: AppApi }) {
         <button className="btn btn-primary justify-center" onClick={() => fileRef.current?.click()}>
           Upload Shopify export (.csv)
         </button>
-        <label className="flex items-center gap-2 text-sm text-ink-soft">
-          <input type="checkbox" checked={app.includeFulfilled} onChange={(e) => app.setIncludeFulfilled(e.target.checked)} />
-          Include orders already fulfilled
-        </label>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label htmlFor="paste" className="text-sm font-semibold">
-          Or paste zip codes
-        </label>
-        <textarea
-          id="paste"
-          className="field font-mono text-sm"
-          rows={4}
-          placeholder={'85004\n#1042 33131 x2\n02138 2-Day'}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-        <button className="btn justify-center" onClick={onPaste} disabled={!text.trim()}>
-          Use pasted list
-        </button>
+        {app.shippedCount > 0 && (
+          <label className="flex items-center gap-2 text-sm text-ink-soft">
+            <input type="checkbox" checked={app.includeFulfilled} onChange={(e) => app.setIncludeFulfilled(e.target.checked)} />
+            Show the {app.shippedCount} order{app.shippedCount === 1 ? '' : 's'} that already shipped
+          </label>
+        )}
       </div>
 
       <button className="btn btn-quiet justify-center" onClick={onSample}>
         Load sample orders
       </button>
 
-      {note && (
-        <p className="text-sm" role="status">
-          {note}
-        </p>
-      )}
+      <StatusLine app={app} />
       {error && (
         <p className="text-sm text-hot" role="alert">
           {error}
@@ -150,7 +123,7 @@ function InputDock({ app }: { app: AppApi }) {
         <p className="text-ink-faint text-xs">Forecasts reach 16 days out; confidence drops after 7.</p>
       </div>
 
-      <button className="btn btn-primary justify-center text-base" onClick={app.build} disabled={!canBuild}>
+      <button className="btn btn-primary justify-center text-base" onClick={() => void app.build()} disabled={!canBuild}>
         {app.run.phase === 'loading' ? 'Fetching forecasts…' : app.ctx ? 'Rebuild pack list' : 'Build pack list'}
       </button>
       {!app.zipDb && !app.zipError && <p className="text-ink-faint text-xs">Loading the zip code table…</p>}
@@ -159,7 +132,7 @@ function InputDock({ app }: { app: AppApi }) {
           The zip table failed to load: {app.zipError}. Reload the page.
         </p>
       )}
-      {app.orders.length > 0 && (
+      {app.allOrders.length > 0 && (
         <button className="text-sm text-ink-soft underline self-start" onClick={app.clearOrders}>
           Clear orders
         </button>
@@ -177,22 +150,24 @@ function Results({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => v
       <section className="sheet p-8 text-center">
         <h2 className="display text-xl mb-2">No orders yet</h2>
         <p className="text-ink-soft max-w-md mx-auto">
-          Upload today's Shopify export or paste a few zip codes on the left. If you just want to see it work, load the sample orders.
+          Upload today's Shopify export on the left. If you just want to see it work, load the sample orders.
         </p>
       </section>
     )
   }
 
-  if (!app.ctx) {
+  if (!app.ctx || app.run.phase === 'loading') {
     return (
       <section className="sheet p-8 text-center">
         <h2 className="display text-xl mb-2">
           {app.orders.length} order{app.orders.length === 1 ? '' : 's'} loaded
           {app.sourceLabel ? ` from ${app.sourceLabel}` : ''}
         </h2>
-        <p className="text-ink-soft max-w-md mx-auto">
-          {app.run.phase === 'loading' ? 'Fetching forecasts for every destination…' : 'Pick the ship date and build the pack list.'}
-        </p>
+        {app.run.phase === 'loading' ? (
+          <Progress step={app.step} orders={app.orders.length} />
+        ) : (
+          <p className="text-ink-soft max-w-md mx-auto">Pick the ship date and build the pack list.</p>
+        )}
       </section>
     )
   }
@@ -224,9 +199,10 @@ function Results({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => v
           <thead>
             <tr>
               <th scope="col">Order</th>
-              <th scope="col">Ship to</th>
-              <th scope="col">Service</th>
+              <th scope="col">Destination</th>
+              <th scope="col">Shipping method</th>
               <th scope="col">Arrives</th>
+              <th scope="col">Trip</th>
               <th scope="col">Worst case</th>
               <th scope="col">Pack</th>
               <th scope="col">Pull</th>
@@ -236,10 +212,11 @@ function Results({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => v
             </tr>
           </thead>
           <tbody>
-            {lines.map((line) => (
+            {lines.map((line, index) => (
               <Row
                 key={line.order.id}
                 line={line}
+                index={index}
                 app={app}
                 open={open === line.order.id}
                 onToggle={() => setOpen(open === line.order.id ? null : line.order.id)}
@@ -252,8 +229,35 @@ function Results({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => v
   )
 }
 
-function Row({ line, app, open, onToggle }: { line: PackLine; app: AppApi; open: boolean; onToggle: () => void }) {
+const STEPS: { id: Exclude<BuildStep, null>; label: (n: number) => string }[] = [
+  { id: 'locating', label: (n) => `Locating ${n} zip code${n === 1 ? '' : 's'}` },
+  { id: 'forecasting', label: () => 'Fetching 16-day forecasts for every route' },
+  { id: 'deciding', label: () => 'Deciding every box' },
+]
+
+function Progress({ step, orders }: { step: BuildStep; orders: number }) {
+  const idx = STEPS.findIndex((s) => s.id === step)
+  return (
+    <ol className="inline-flex flex-col gap-2 text-left mx-auto" aria-live="polite">
+      {STEPS.map((s, i) => {
+        const state = i < idx ? 'done' : i === idx ? 'now' : 'todo'
+        return (
+          <li key={s.id} className={`flex items-center gap-3 ${state === 'todo' ? 'text-ink-faint' : ''}`}>
+            <span
+              className={`inline-block w-5 h-5 rounded-full border-2 ${state === 'done' ? 'bg-ink border-ink' : state === 'now' ? 'border-ink animate-pulse' : 'border-line-strong'}`}
+              aria-hidden="true"
+            />
+            <span className={state === 'now' ? 'font-semibold' : ''}>{s.label(orders)}</span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+function Row({ line, app, open, onToggle, index }: { line: PackLine; app: AppApi; open: boolean; onToggle: () => void; index: number }) {
   const d = line.decision
+  const stagger = `${Math.min(index, 14) * 45}ms`
   const tier = effectiveTier(line)
   const m = lineMaterials(line, app.settings)
   const flags = (d.recommendation ? 1 : 0) + d.warnings.length
@@ -261,7 +265,7 @@ function Row({ line, app, open, onToggle }: { line: PackLine; app: AppApi; open:
 
   return (
     <>
-      <tr className={open ? 'bg-stone' : undefined}>
+      <tr className={`row-in ${open ? 'bg-stone' : ''}`} style={{ ['--stagger' as string]: stagger }}>
         <td>
           <div className="font-semibold">{d.orderId}</div>
           {line.order.customer && <div className="text-ink-soft text-sm">{line.order.customer}</div>}
@@ -271,14 +275,16 @@ function Row({ line, app, open, onToggle }: { line: PackLine; app: AppApi; open:
           <div className="text-ink-soft text-sm">{d.zip}</div>
         </td>
         <td>
-          <div>{SERVICE_LABEL[d.serviceLevel]}</div>
-          {d.status === 'ok' && (
-            <div className="text-ink-soft text-sm">
-              {d.transitDays} day{d.transitDays === 1 ? '' : 's'}
-            </div>
-          )}
+          <div>{line.order.shippingMethod || SERVICE_LABEL[d.serviceLevel]}</div>
+          <div className="text-ink-soft text-sm">
+            {SERVICE_LABEL[d.serviceLevel]}
+            {d.status === 'ok' ? `, ${d.transitDays} day${d.transitDays === 1 ? '' : 's'}` : ''}
+          </div>
         </td>
         <td>{d.status === 'ok' ? formatShort(d.deliveryDate) : '—'}</td>
+        <td>
+          <TripStrip decision={d} settings={app.settings} />
+        </td>
         <td>
           {d.worst ? (
             <>
@@ -294,7 +300,9 @@ function Row({ line, app, open, onToggle }: { line: PackLine; app: AppApi; open:
           )}
         </td>
         <td>
-          <TierStamp tier={tier} status={d.status} />
+          <span className="stamp-in inline-block" style={{ ['--stagger' as string]: stagger }}>
+            <TierStamp tier={tier} status={d.status} />
+          </span>
           {line.override && <div className="text-ink-soft text-xs mt-1">changed by hand</div>}
         </td>
         <td className="whitespace-nowrap">
@@ -328,7 +336,7 @@ function Row({ line, app, open, onToggle }: { line: PackLine; app: AppApi; open:
       </tr>
       {open && (
         <tr id={panelId}>
-          <td colSpan={8} className="bg-stone">
+          <td colSpan={9} className="bg-stone">
             <Details line={line} app={app} />
           </td>
         </tr>

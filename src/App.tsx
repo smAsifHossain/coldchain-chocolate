@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useApp } from './app/useApp'
 import { DayStrip } from './components/DayStrip'
+import { Landing } from './components/Landing'
 import { OrdersView } from './components/OrdersView'
 import { PackListView } from './components/PackListView'
 import { PlannerView } from './components/PlannerView'
 import { SettingsView } from './components/SettingsView'
 import { AboutView } from './components/AboutView'
 
-type Tab = 'orders' | 'packlist' | 'planner' | 'settings' | 'about'
+type Tab = 'home' | 'orders' | 'packlist' | 'planner' | 'settings' | 'about'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'orders', label: 'Orders' },
+  { id: 'home', label: 'Home' },
+  { id: 'orders', label: 'Planner' },
   { id: 'packlist', label: 'Pack list' },
   { id: 'planner', label: 'Which day' },
   { id: 'settings', label: 'Settings' },
@@ -19,7 +21,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 function tabFromHash(): Tab {
   const h = window.location.hash.replace('#', '') as Tab
-  return TABS.some((t) => t.id === h) ? h : 'orders'
+  return TABS.some((t) => t.id === h) ? h : 'home'
 }
 
 export default function App() {
@@ -35,7 +37,15 @@ export default function App() {
   const go = (t: Tab) => {
     window.location.hash = t
     setTab(t)
+    window.scrollTo({ top: 0 })
   }
+
+  const demo = async () => {
+    go('orders')
+    await app.runDemo()
+  }
+
+  const wide = tab === 'home'
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -44,7 +54,9 @@ export default function App() {
       </a>
       <header className="bg-cocoa-deep text-white no-print">
         <div className="mx-auto max-w-7xl px-4 md:px-6 py-3 flex items-center gap-4">
-          <div className="display text-xl tracking-tight">ColdChain</div>
+          <button className="display text-xl tracking-tight text-white" onClick={() => go('home')} aria-label="ColdChain home">
+            ColdChain
+          </button>
           <div className="text-white/70 text-sm hidden sm:block">Thermal pack planner for Cocoa Dolce</div>
         </div>
         <nav className="mx-auto max-w-7xl px-4 md:px-6 overflow-x-auto" aria-label="Sections">
@@ -65,8 +77,9 @@ export default function App() {
         </nav>
       </header>
 
-      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-7xl px-4 md:px-6 py-5 flex flex-col gap-5 flex-1">
-        {tab !== 'about' && tab !== 'settings' && (
+      <main id="main" tabIndex={-1} className={wide ? 'flex-1' : 'mx-auto w-full max-w-7xl px-4 md:px-6 py-5 flex flex-col gap-5 flex-1'}>
+        {tab === 'home' && <Landing app={app} onOpenPlanner={() => go('orders')} onDemo={demo} onAbout={() => go('about')} />}
+        {(tab === 'orders' || tab === 'packlist' || tab === 'planner') && (
           <div className={tab === 'packlist' ? 'no-print' : undefined}>
             <DayStrip shipDate={app.shipDate} ctx={app.ctx} lines={app.lines} settings={app.settings} run={app.run} />
           </div>

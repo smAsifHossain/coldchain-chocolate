@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseCsv, parseInput, parseList } from '../import'
+import { parseCsv } from '../import'
 import { toCsv } from '../export'
 import { effectiveTier, lineMaterials, sortForBench, summarize, type PackLine } from '../packlist'
 import { decide } from '../decide'
@@ -55,22 +55,6 @@ describe('generic CSV', () => {
   })
   it('explains when there is no zip column', () => {
     expect(() => parseCsv('a,b\n1,2\n')).toThrow(/No zip column/)
-  })
-})
-
-describe('pasted list', () => {
-  it('reads zips with optional ids, quantities and service', () => {
-    const r = parseList('85004\n#1050 33101 x2\n02138, 3\n98101 2-Day\n\nnot a zip\n')
-    expect(r.orders).toEqual([
-      expect.objectContaining({ id: 'Zip 1', zip: '85004', qty: 1 }),
-      expect.objectContaining({ id: '#1050', zip: '33101', qty: 2 }),
-      expect.objectContaining({ id: 'Zip 3', zip: '02138', qty: 3 }),
-      expect.objectContaining({ id: 'Zip 4', zip: '98101', serviceLevel: 'two_day' }),
-    ])
-  })
-  it('parseInput routes CSV text to the CSV parser and lists to the list parser', () => {
-    expect(parseInput('zip,qty\n85004,1\n').source).toBe('csv')
-    expect(parseInput('85004\n33101\n').source).toBe('list')
   })
 })
 
