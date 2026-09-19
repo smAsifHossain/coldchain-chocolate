@@ -53,7 +53,7 @@ export function PlannerView({ app }: { app: AppApi }) {
       <div className="px-5 py-4 border-b border-line">
         <h2 className="display text-lg">Which day to ship</h2>
         <p className="text-ink-soft text-sm">
-          Each cell is the tier if that order ships that day. Weekends have no pickup.{' '}
+          Each cell is the tier if that order ships that day; a “wait” tag marks an order that would do better on a later day. Weekends have no pickup.{' '}
           {bestIdx === 0 ? (
             <>
               <strong className="text-ink">{formatShort(dates[0])}</strong> is already the best day this week: {today.double} of {today.ok} need ice, about ${today.cost.toFixed(2)} in packaging.
@@ -76,13 +76,23 @@ export function PlannerView({ app }: { app: AppApi }) {
                 <th key={d} scope="col" className={`text-center ${i === bestIdx ? 'bg-cold-bg' : ''} ${isWeekend(d) ? 'text-ink-faint' : ''}`}>
                   <div>{weekdayName(d)}</div>
                   <div className="font-normal">{formatShort(d).slice(4)}</div>
+                  {i === bestIdx && <div className="text-cold text-xs font-semibold mt-1">{bestIdx === 0 ? 'ship as planned' : 'best for the batch'}</div>}
+                  {i === 0 && bestIdx !== 0 && <div className="text-ink-faint text-xs font-normal mt-1">planned</div>}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {plan.map(({ order, days }) => {
-              const best = bestFor(days.map((d) => d.decision))
+              const decisions = days.map((d) => d.decision)
+              const best = bestFor(decisions, dates)
+              const planned = decisions[0]
+              const improvement =
+                best > 0 && planned.status === 'ok' && planned.worst && decisions[best].worst
+                  ? TIER_RANK[decisions[best].tier] < TIER_RANK[planned.tier]
+                    ? 'less ice'
+                    : `${Math.round(planned.worst.high! - decisions[best].worst!.high!)}° cooler`
+                  : null
               return (
                 <tr key={order.id}>
                   <th scope="row" className="text-left font-semibold whitespace-nowrap">
@@ -94,7 +104,7 @@ export function PlannerView({ app }: { app: AppApi }) {
                     const heat = weekend || decision.status !== 'ok' ? '' : `heat-${decision.tier}`
                     return (
                       <td key={shipDate} className={`text-center ${heat} ${i === bestIdx ? 'outline outline-2 -outline-offset-2 outline-cold' : ''}`}>
-                        <Cell decision={decision} weekend={weekend} best={i === best} />
+                        <Cell decision={decision} weekend={weekend} note={i === best ? improvement : null} />
                       </td>
                     )
                   })}
@@ -135,11 +145,15 @@ function firstWeekday(dates: string[]): number {
   return i === -1 ? 0 : i
 }
 
-/** Index of the coolest weekday for one order (lowest tier, then lowest worst-case). */
-function bestFor(decisions: Decision[]): number {
+/**
+ * Index of the best weekday for one order: lowest tier, then lowest worst-case
+ * high. Ties go to the earlier day, so "wait" is only suggested when it helps.
+ */
+function bestFor(decisions: Decision[], dates: string[]): number {
   let best = -1
   decisions.forEach((d, i) => {
-    if (d.status !== 'ok' || !d.worst) return
+    // A weekend "ship date" silently becomes the next Monday; never suggest it.
+    if (isWeekend(dates[i]) || d.status !== 'ok' || !d.worst) return
     if (best === -1) {
       best = i
       return
@@ -150,15 +164,16 @@ function bestFor(decisions: Decision[]): number {
   return best
 }
 
-function Cell({ decision, weekend, best }: { decision: Decision; weekend: boolean; best: boolean }) {
+function Cell({ decision, weekend, note }: { decision: Decision; weekend: boolean; note: string | null }) {
   if (weekend) return <span className="text-ink-faint text-sm">no pickup</span>
   if (decision.status !== 'ok' || !decision.worst) return <span className="text-review text-sm">check</span>
   const tier: Tier = decision.tier
   const cls = tier === 'double' ? 'text-hot' : tier === 'single' ? 'text-foil' : 'text-cold'
   return (
-    <div className={`${cls} ${best ? 'font-extrabold underline decoration-2 underline-offset-4' : ''}`} title={best ? 'Coolest day for this order' : undefined}>
+    <div className={`${cls} ${note ? 'font-extrabold' : ''}`} title={note ? `Waiting until this day: ${note}` : undefined}>
       <div className="text-lg leading-none">{Math.round(decision.worst.high!)}°</div>
       <div className="text-xs">{tier === 'double' ? 'double + ice' : tier === 'single' ? 'single' : 'none'}</div>
+      {note && <div className="mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-bold bg-paper border border-current">wait: {note}</div>}
     </div>
   )
 }
