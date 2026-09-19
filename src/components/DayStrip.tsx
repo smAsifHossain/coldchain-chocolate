@@ -27,7 +27,7 @@ export function DayStrip({ shipDate, ctx, lines, settings, run }: Props) {
             {ctx ? `${ctx.origin.city}, ${ctx.origin.state} high` : 'Origin high'}
           </div>
           <div className="display text-2xl md:text-3xl">
-            {originDay ? `${Math.round(originDay.high)}°F` : '—'}
+            {originDay ? `${Math.round(originDay.high)}°F` : 'loading'}
           </div>
         </div>
         {summary && (

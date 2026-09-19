@@ -10,7 +10,7 @@ export const DEFAULT_SETTINGS: Settings = {
   pickupCutoff: '15:00',
   observeHolidays: true,
   productRules: [
-    { label: 'Cream centers: truffles, ganache, caramels, bonbons', pattern: 'truffle|ganache|caramel|bonbon|cream', offset: -5 },
+    { label: 'Cream centers (truffles, ganache, caramels, bonbons)', pattern: 'truffle|ganache|caramel|bonbon|cream', offset: -5 },
     { label: 'White or milk chocolate', pattern: 'white|milk', offset: -3 },
   ],
   thresholds: { single: 65, double: 80, hold: 95 },
@@ -95,7 +95,7 @@ export function validateSettings(s: Settings): string[] {
     } catch {
       problems.push(`Product rule "${r.label || r.pattern}" is not a valid pattern.`)
     }
-    if (r.offset > 0) problems.push(`Product rule "${r.label}" raises the thresholds — rules can only make the call more careful.`)
+    if (r.offset > 0) problems.push(`Product rule "${r.label}" raises the thresholds. Rules can only make the call more careful.`)
   }
   let prev = 0
   for (const z of s.transit.zones) {

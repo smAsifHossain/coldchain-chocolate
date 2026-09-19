@@ -191,7 +191,7 @@ function Thermometer({
       <figcaption className="flex flex-col gap-1 min-w-[12rem]" key={place}>
         <div className="text-ink-soft text-sm fade-in">{place ? `${place}, ${formatShort(date)}` : formatShort(date)}</div>
         <div className="display text-5xl fade-in" style={{ color, transition: 'color 500ms ease' }}>
-          {high === null ? '—' : `${Math.round(high)}°F`}
+          {high === null ? 'loading' : `${Math.round(high)}°F`}
         </div>
         <div className="text-sm text-ink-soft fade-in">{label}</div>
       </figcaption>
@@ -224,11 +224,11 @@ function HowItWorks({ app }: { app: AppApi }) {
     },
     {
       title: 'Check the weather along every route',
-      body: `Ground transit is estimated from distance; delivery skips weekends. Daily highs are fetched for ${app.origin.city}, the route and each destination, from ship day to a day on the porch — one request for the whole batch.`,
+      body: `Ground transit is estimated from distance; delivery skips weekends. Daily highs are fetched for ${app.origin.city}, the route and each destination, from ship day to the day after delivery, in one request for the whole batch.`,
     },
     {
       title: 'Stamp every box',
-      body: `The hottest day anywhere on the trip sets the tier: below ${s.thresholds.single}°F nothing, from ${s.thresholds.single}°F a liner, from ${s.thresholds.double}°F two liners and ice. The bench gets a printed list, grouped by what to pull, hottest first.`,
+      body: `The hottest day anywhere on the trip sets the tier. Below ${s.thresholds.single}°F nothing, from ${s.thresholds.single}°F a liner, from ${s.thresholds.double}°F two liners and ice. The bench gets a printed list, grouped by what to pull, hottest first.`,
     },
   ]
   return (

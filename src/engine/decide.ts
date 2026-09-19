@@ -227,7 +227,7 @@ function reviewDecision(order: Order, resolved: ResolvedOrder, ctx: DecideContex
     icePacks: mats.icePacks,
     cost: mats.cost,
     recommendation: null,
-    warnings: [reason, 'Defaulted to the safest tier — check this address by hand.'],
+    warnings: [reason, 'Defaulted to the safest tier. Check this address by hand.'],
     reasons: [],
     confidence: 'none',
   }
@@ -236,7 +236,7 @@ function reviewDecision(order: Order, resolved: ResolvedOrder, ctx: DecideContex
 export function decide(order: Order, ctx: DecideContext, opts: DecideOptions = {}): Decision {
   const s = ctx.settings
   const resolved = resolveOrder(order, ctx.zipDb)
-  if (resolved.nonUS) return reviewDecision(order, resolved, ctx, `${resolved.note} — only US zips are forecast.`)
+  if (resolved.nonUS) return reviewDecision(order, resolved, ctx, `${resolved.note}. Only US zips are forecast.`)
   if (!resolved.place || !resolved.zip) return reviewDecision(order, resolved, ctx, resolved.note ?? 'Address could not be located.')
 
   const dest = resolved.place
@@ -244,7 +244,7 @@ export function decide(order: Order, ctx: DecideContext, opts: DecideOptions = {
   const reasons: string[] = []
   if (resolved.note) warnings.push(resolved.note)
   if (order.address && /\bP\.?\s?O\.?\s?box\b/i.test(order.address)) {
-    warnings.push('PO Box address — UPS and FedEx cannot deliver here; ship USPS.')
+    warnings.push('PO Box address. UPS and FedEx cannot deliver here, so ship USPS.')
   }
 
   const service = opts.serviceOverride ?? order.serviceLevel ?? parseServiceLevel(order.shippingMethod)
@@ -258,29 +258,29 @@ export function decide(order: Order, ctx: DecideContext, opts: DecideOptions = {
   const ship = pickup ? { date: requested, shifted: false, holiday: false } : effectiveShipDate(requested, s.observeHolidays)
   if (ship.shifted) {
     warnings.push(
-      `${formatShort(requested)} is a ${ship.holiday ? 'carrier holiday' : 'weekend'} — no pickup, so this ships ${formatShort(ship.date)}.`,
+      `${formatShort(requested)} is a ${ship.holiday ? 'carrier holiday' : 'weekend'} with no pickup, so this ships ${formatShort(ship.date)}.`,
     )
   }
   const delivery = pickup ? ship.date : deliveryDate(ship.date, transit.days, s.saturdayDelivery, s.observeHolidays)
 
   if (pickup) {
-    reasons.push(`Store pickup — judged on ${placeLabel(ctx.origin)}'s high the day it is collected, ${formatShort(ship.date)}.`)
+    reasons.push(`Store pickup, judged on ${placeLabel(ctx.origin)}'s high the day it is collected, ${formatShort(ship.date)}.`)
   } else {
-    reasons.push(`${transit.basis} → ${transit.days} transit day${transit.days === 1 ? '' : 's'}, delivered ${formatShort(delivery)}.`)
+    reasons.push(`${transit.basis}, so ${transit.days} transit day${transit.days === 1 ? '' : 's'}, delivered ${formatShort(delivery)}.`)
   }
   if (transit.nonContiguous && service === 'ground') {
     warnings.push(
       MILITARY.has(dest.state)
-        ? 'Military address — USPS only, and transit can take weeks. Ice will not last; ship the least heat-sensitive products or hold for cooler weather.'
-        : `Ground to ${dest.state} is slow and unpredictable — consider air service.`,
+        ? 'Military address. USPS only, and transit can take weeks. Ice will not last, so ship the least heat-sensitive products or hold for cooler weather.'
+        : `Ground to ${dest.state} is slow and unpredictable, so consider air service.`,
     )
   }
   if (!pickup && s.observeHolidays) {
     const hol = spansHoliday(ship.date, delivery)
-    if (hol) warnings.push(`${formatShort(hol)} is a carrier holiday — the box sits still that day; delivery already accounts for it.`)
+    if (hol) warnings.push(`${formatShort(hol)} is a carrier holiday, so the box sits still that day. Delivery already accounts for it.`)
   }
   if (rule) {
-    reasons.push(`${rule.label} in the box — thresholds lowered ${Math.abs(rule.offset)}°F (single from ${th.single}°F, double from ${th.double}°F).`)
+    reasons.push(`${rule.label} in the box, so thresholds are lowered ${Math.abs(rule.offset)}°F (single from ${th.single}°F, double from ${th.double}°F).`)
   }
 
   const built = pickup ? buildPickupWindow(ship.date, ctx) : buildWindow(dest, ship.date, delivery, ctx)
@@ -306,7 +306,7 @@ export function decide(order: Order, ctx: DecideContext, opts: DecideOptions = {
       icePacks: mats.icePacks,
       cost: mats.cost,
       recommendation: null,
-      warnings: [...warnings, 'No forecast is available for this window — defaulted to the safest tier. Check the weather by hand.'],
+      warnings: [...warnings, 'No forecast is available for this window, so it defaulted to the safest tier. Check the weather by hand.'],
       reasons,
       confidence: 'none',
     }
@@ -321,18 +321,18 @@ export function decide(order: Order, ctx: DecideContext, opts: DecideOptions = {
     destination: 'delivery day',
     porch: 'day after delivery',
   }
-  const threshold = tier === 'double' ? `≥ ${th.double}°F` : tier === 'single' ? `≥ ${th.single}°F` : `< ${th.single}°F`
+  const threshold = tier === 'double' ? `at or above ${th.double}°F` : tier === 'single' ? `at or above ${th.single}°F` : `below ${th.single}°F`
   reasons.unshift(
-    `Worst case ${fmtTemp(worst.high!)} in ${worst.place} on ${formatShort(worst.date)} (${roleText[worst.role]}) — ${threshold} → ${TIER_LABEL[tier]}.`,
+    `Worst case ${fmtTemp(worst.high!)} in ${worst.place} on ${formatShort(worst.date)} (${roleText[worst.role]}), ${threshold}, so ${TIER_LABEL[tier]}.`,
   )
 
   if (s.coldRule.enabled && built.coldest && built.coldest.low! < s.coldRule.below && tier === 'none') {
     tier = 'single'
-    reasons.push(`Low of ${fmtTemp(built.coldest.low!)} in ${built.coldest.place} on ${formatShort(built.coldest.date)} is below ${s.coldRule.below}°F → liner added for cold protection.`)
+    reasons.push(`Low of ${fmtTemp(built.coldest.low!)} in ${built.coldest.place} on ${formatShort(built.coldest.date)} is below ${s.coldRule.below}°F, so a liner is added for cold protection.`)
   }
 
   if (built.missingDates.length > 0) {
-    warnings.push(`No forecast yet for ${built.missingDates.map(formatShort).join(', ')} — decision uses the days that are available.`)
+    warnings.push(`No forecast yet for ${built.missingDates.map(formatShort).join(', ')}, so the decision uses the days that are available.`)
   }
   if (!pickup && tier !== 'none' && spansWeekend(ship.date, delivery)) {
     warnings.push('Sits in a carrier hub over the weekend. Shipping Monday–Wednesday avoids this.')
@@ -408,13 +408,13 @@ function recommend(order: Order, ctx: DecideContext, input: RecommendInput): Rec
 
   const parts: string[] = [why]
   if (expedite) {
-    parts.push(`Upgrade to ${SERVICE_LABEL[expedite.level]}: delivered ${formatShort(expedite.d.deliveryDate)}, worst case ${fmtTemp(expedite.d.worst!.high!)} → ${TIER_LABEL[expedite.d.tier]}.`)
+    parts.push(`Upgrade to ${SERVICE_LABEL[expedite.level]}, delivered ${formatShort(expedite.d.deliveryDate)}, worst case ${fmtTemp(expedite.d.worst!.high!)}, ${TIER_LABEL[expedite.d.tier]}.`)
   }
   if (better) {
-    parts.push(`Or hold until ${formatShort(better.shipDate)}: worst case ${fmtTemp(better.worst!.high!)} → ${TIER_LABEL[better.tier]}.`)
+    parts.push(`Or hold until ${formatShort(better.shipDate)}, worst case ${fmtTemp(better.worst!.high!)}, ${TIER_LABEL[better.tier]}.`)
   }
   if (!expedite && !better) {
-    parts.push('No cooler option in the next 7 days — ship with maximum protection or call the customer.')
+    parts.push('No cooler option in the next 7 days. Ship with maximum protection or call the customer.')
   }
 
   const action: Recommendation['action'] = expedite && expedite.d.worst!.high! < th.hold ? 'expedite' : better ? 'hold' : 'expedite'

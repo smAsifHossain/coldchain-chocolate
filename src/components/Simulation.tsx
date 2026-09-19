@@ -315,7 +315,7 @@ export function Simulation({ app }: { app: AppApi }) {
                     <div className="h-40 md:h-52 w-full max-w-16 flex items-end">
                       <div className={`bar bar-${c.tier}`} style={{ ['--h' as string]: frame >= i ? barHeight(c.high) : '0%' }} />
                     </div>
-                    <div className="display text-lg md:text-2xl">{c.high === null ? '—' : `${Math.round(c.high)}°`}</div>
+                    <div className="display text-lg md:text-2xl">{c.high === null ? 'none' : `${Math.round(c.high)}°`}</div>
                     <div className="text-sm text-center leading-tight">
                       <div>{weekdayName(c.date)}</div>
                       <div className="faint text-xs">{c.date.slice(5).replace('-', '/')}</div>
@@ -331,7 +331,7 @@ export function Simulation({ app }: { app: AppApi }) {
                 <Verdict decision={decision} destLabel={dest ? `${dest.city}, ${dest.state}` : ''} />
               ) : (
                 <p className="muted">
-                  {frame < 0 ? 'Leaving…' : frame < cols.length ? `${formatShort(cols[boxIdx].date)}: ${roleLabel(cols[boxIdx], originLabel)}` : ''}
+                  {frame < 0 ? 'Leaving…' : frame < cols.length ? `${formatShort(cols[boxIdx].date)}, ${roleLabel(cols[boxIdx], originLabel)}` : ''}
                 </p>
               )}
             </div>
@@ -359,12 +359,12 @@ function Verdict({ decision: d, destLabel }: { decision: Decision; destLabel: st
         Worst case <strong>{Math.round(d.worst!.high!)}°F</strong> in {d.worst!.place} on {formatShort(d.worst!.date)}.
       </p>
       <p className="muted text-sm">
-        {destLabel}: {SERVICE_LABEL[d.serviceLevel]}, {d.transitDays} day{d.transitDays === 1 ? '' : 's'}, delivered {formatShort(d.deliveryDate)}.
+        To {destLabel} by {SERVICE_LABEL[d.serviceLevel]}, {d.transitDays} day{d.transitDays === 1 ? '' : 's'}, delivered {formatShort(d.deliveryDate)}.
       </p>
       <p>
         <span className="muted text-sm">Pull </span>
         <strong>{pull.length ? pull.join(' + ') : 'nothing extra'}</strong>
-        {d.cost > 0 && <span className="muted text-sm"> — about ${d.cost.toFixed(2)}</span>}
+        {d.cost > 0 && <span className="muted text-sm">, about ${d.cost.toFixed(2)}</span>}
       </p>
       {d.recommendation && <p className="text-sm" style={{ color: '#f0c8a0' }}>{d.recommendation.detail}</p>}
       {d.warnings.length > 0 && <p className="faint text-xs">{d.warnings[0]}</p>}

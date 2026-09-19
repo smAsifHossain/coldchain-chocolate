@@ -6,7 +6,7 @@ import { TierStamp } from './TierStamp'
 const LIMITS: { limit: string; fix: string }[] = [
   {
     limit: 'The forecast is for the center of the zip code, not the doorstep. A hillside address can run a few degrees off.',
-    fix: 'Geocode the full street address. Not done on purpose: it would send customer addresses to a third-party service; today nothing about an order leaves the browser.',
+    fix: 'Geocode the full street address. Not done on purpose, because it would send customer addresses to a third-party service. Today nothing about an order leaves the browser.',
   },
   {
     limit: 'Hub and truck temperatures are guessed from the route midpoint. A box in a metal trailer in the sun runs hotter than the air.',
@@ -18,7 +18,7 @@ const LIMITS: { limit: string; fix: string }[] = [
   },
   {
     limit: 'Forecast confidence drops after 7 days and there is nothing beyond 16. Next week is an estimate.',
-    fix: 'Physics. Run it again the morning of shipping — that is the intended daily workflow, and confidence is printed on every row.',
+    fix: 'Physics. Run it again the morning of shipping. That is the intended daily workflow, and confidence is printed on every row.',
   },
   {
     limit: 'Porch time after delivery is a flat buffer. A box left out over a long weekend is not modeled.',
@@ -26,7 +26,7 @@ const LIMITS: { limit: string; fix: string }[] = [
   },
   {
     limit: 'Product sensitivity rules ship with starting numbers (cream centers 5°F stricter, milk and white chocolate 3°F). They are educated guesses, not measurements.',
-    fix: 'Cocoa Dolce knows its own recipes: adjust the offsets in Settings, or add a rule per SKU.',
+    fix: 'Cocoa Dolce knows its own recipes. Adjust the offsets in Settings, or add a rule per SKU.',
   },
   {
     limit: 'Ice-pack counts are rules of thumb, not thermodynamics. Box size, liner quality and pack size all matter.',
@@ -39,10 +39,10 @@ const LIMITS: { limit: string; fix: string }[] = [
 ]
 
 const SOLVED: string[] = [
-  'A second forecast provider: if Open-Meteo is down, the National Weather Service answers (7 days instead of 16), and the pack list says so.',
+  'A second forecast provider. If Open-Meteo is down, the National Weather Service answers (7 days instead of 16), and the pack list says so.',
   'Puerto Rico, the US Virgin Islands and Guam are in the zip table.',
   'Carrier holidays, the pickup cutoff, store-pickup orders, PO boxes and military addresses are all handled and explained on the row.',
-  'A zip that lands in a different state than the order says is flagged instead of silently trusted — the kind of typo that looks right until the box melts.',
+  'A zip that lands in a different state than the order says is flagged instead of silently trusted. It is the kind of typo that looks right until the box melts.',
 ]
 
 export function AboutView({ app }: { app: AppApi }) {
@@ -56,23 +56,23 @@ export function AboutView({ app }: { app: AppApi }) {
           <ol className="flex flex-col gap-4 list-decimal pl-5 max-w-prose">
             <li>
               <strong>Find the destination.</strong> The zip is cleaned up (ZIP+4 trimmed, Excel’s dropped leading zeros restored) and looked up in a bundled table of
-              41,700 zip codes covering the 50 states, DC, Puerto Rico, the Virgin Islands and Guam — so this step never waits on the network. A zip in the wrong state
+              41,700 zip codes covering the 50 states, DC, Puerto Rico, the Virgin Islands and Guam, so this step never waits on the network. A zip in the wrong state
               for the order is sent to “check by hand”.
             </li>
             <li>
-              <strong>Estimate the trip.</strong> Distance from {app.origin.city} sets ground transit days ({s.transit.zones.map((z) => `≤${z.maxMiles} mi: ${z.days}`).join(', ')}, farther: {s.transit.farDays}).
+              <strong>Estimate the trip.</strong> Distance from {app.origin.city} sets ground transit days ({s.transit.zones.map((z) => `${z.days} up to ${z.maxMiles} mi`).join(', ')}, {s.transit.farDays} beyond).
               2-Day Air and Next Day Air orders use their service; store pickups have no trip at all. Delivery skips Sundays{s.saturdayDelivery ? '' : ', Saturdays'}
               {s.observeHolidays ? ' and the six carrier holidays' : ''}; after the {s.pickupCutoff} pickup, “today” means the next carrier day.
             </li>
             <li>
-              <strong>Fetch the forecast.</strong> Daily highs and lows for the next 16 days from Open-Meteo for the origin, the destination{s.routeWaypoint ? ' and the route midpoint' : ''} —
-              one request for the whole batch, no account or key. If Open-Meteo is down, the National Weather Service fills in.
+              <strong>Fetch the forecast.</strong> Daily highs and lows for the next 16 days from Open-Meteo for the origin, the destination{s.routeWaypoint ? ' and the route midpoint' : ''},
+              in one request for the whole batch with no account or key. If Open-Meteo is down, the National Weather Service fills in.
             </li>
             <li>
               <strong>Build the exposure window.</strong> Ship day at origin, every day in transit, delivery day at the destination, and {s.porchDays} day{s.porchDays === 1 ? '' : 's'} after delivery, in case the box sits outside.
             </li>
             <li>
-              <strong>Take the worst case.</strong> The highest daily high anywhere in that window decides the tier: below {s.thresholds.single}°F no thermal, from {s.thresholds.single}°F a single
+              <strong>Take the worst case.</strong> The highest daily high anywhere in that window decides the tier. Below {s.thresholds.single}°F no thermal, from {s.thresholds.single}°F a single
               liner, from {s.thresholds.double}°F two liners with ice packs. Boxes with cream centers or milk chocolate are judged a few degrees stricter. At {s.thresholds.hold}°F or above, or when a hot trip runs{' '}
               {s.longHotTransitDays}+ days, it also works out whether a faster service or a later ship day would help.
             </li>
@@ -81,7 +81,7 @@ export function AboutView({ app }: { app: AppApi }) {
               times the number of boxes. Cost uses the unit prices in Settings.
             </li>
             <li>
-              <strong>Show the work.</strong> Every row lists the temperature, place and day that drove the call, so the packer can agree or change it — and the change is recorded on the pack list.
+              <strong>Show the work.</strong> Every row lists the temperature, place and day that drove the call, so the packer can agree or change it, and the change is recorded on the pack list.
             </li>
           </ol>
           <h3 className="display text-lg mt-8 mb-2">Data sources</h3>
@@ -106,7 +106,9 @@ export function AboutView({ app }: { app: AppApi }) {
             {LIMITS.map((l, i) => (
               <div key={i} className="border-l-2 border-line-strong pl-3">
                 <dt className="text-sm font-semibold">{l.limit}</dt>
-                <dd className="text-sm text-ink-soft mt-1">Fix: {l.fix}</dd>
+                <dd className="text-sm text-ink-soft mt-1">
+                  <span className="font-semibold text-ink">Fix</span> {l.fix}
+                </dd>
               </div>
             ))}
           </dl>
@@ -183,11 +185,11 @@ function WhatIf({ app }: { app: AppApi }) {
               {m.icePacks > 0 ? `${m.icePacks} ice pack${m.icePacks === 1 ? '' : 's'}` : ''}
               {!m.liners && !m.icePacks ? 'nothing extra' : ''}
             </strong>
-            {m.cost > 0 && <span className="text-ink-soft"> — about ${m.cost.toFixed(2)}</span>}
+            {m.cost > 0 && <span className="text-ink-soft">, about ${m.cost.toFixed(2)}</span>}
           </div>
-          {tooHot && <div className="text-sm text-hot">At or above {t.hold}°F: the planner would suggest a faster service or a cooler ship day.</div>}
+          {tooHot && <div className="text-sm text-hot">At or above {t.hold}°F the planner would suggest a faster service or a cooler ship day.</div>}
           {tier === 'double' && days >= s.longHotTransitDays && !tooHot && (
-            <div className="text-sm text-hot">{days} days on ice is a long trip: the planner would suggest 2-Day Air.</div>
+            <div className="text-sm text-hot">{days} days on ice is a long trip, so the planner would suggest 2-Day Air.</div>
           )}
         </div>
       </div>

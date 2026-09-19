@@ -40,7 +40,7 @@ export function TripStrip({ decision: d }: { decision: Decision }) {
           <span
             key={date}
             className={`${cls} ${worst ? 's-worst' : ''} ${c.role === 'porch' ? 's-porch' : ''} ${c.role === 'destination' ? 's-delivery' : ''}`}
-            title={`${formatShort(date)}, ${ROLE_TEXT[c.role]} — ${c.high === null ? 'no forecast' : `${Math.round(c.high)}°F`} (${c.place})`}
+            title={`${formatShort(date)}, ${ROLE_TEXT[c.role]}, ${c.high === null ? 'no forecast' : `${Math.round(c.high)}°F`} (${c.place})`}
           >
             {weekdayName(date).slice(0, 1)}
           </span>

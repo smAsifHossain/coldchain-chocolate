@@ -50,7 +50,7 @@ export function SettingsView({ app }: { app: AppApi }) {
           <input id="origin" className="field !w-40" value={s.originZip} maxLength={5} inputMode="numeric" onChange={(e) => set((d) => void (d.originZip = e.target.value.replace(/\D/g, '')))} />
           <div className="text-ink-soft text-sm">
             {originPlace ? `${originPlace.city}, ${originPlace.state}` : 'Looking up…'}
-            {app.zipDb && originPlace && originPlace.zip !== s.originZip ? ' — zip not found, using Wichita' : ''}
+            {app.zipDb && originPlace && originPlace.zip !== s.originZip ? ' (zip not found, using Wichita)' : ''}
           </div>
         </div>
         <NumberField label="Days on the porch after delivery" value={s.porchDays} min={0} max={3} onChange={(v) => set((d) => void (d.porchDays = v))} />
@@ -65,7 +65,7 @@ export function SettingsView({ app }: { app: AppApi }) {
           label="Skip carrier holidays"
           checked={s.observeHolidays}
           onChange={(v) => set((d) => void (d.observeHolidays = v))}
-          hint="New Year's, Memorial Day, July 4, Labor Day, Thanksgiving, Christmas: no pickup or delivery."
+          hint="No pickup or delivery on New Year's, Memorial Day, July 4, Labor Day, Thanksgiving and Christmas."
         />
         <div className="flex flex-col gap-1">
           <label className="text-sm font-semibold" htmlFor="cutoff">
@@ -76,7 +76,7 @@ export function SettingsView({ app }: { app: AppApi }) {
         </div>
       </Card>
 
-      <Card title="Product sensitivity" hint="Some products soften sooner than a solid tempered bar. A matching line item lowers every threshold for that box. Starting values — tune them to what you see on the bench.">
+      <Card title="Product sensitivity" hint="Some products soften sooner than a solid tempered bar. A matching line item lowers every threshold for that box. Starting values. Tune them to what you see on the bench.">
         {s.productRules.map((r, i) => (
           <RuleRow
             key={i}
@@ -94,7 +94,7 @@ export function SettingsView({ app }: { app: AppApi }) {
         {s.transit.zones.map((z, i) => (
           <div key={i} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <NumberField label={i === 0 ? 'Up to (miles)' : undefined} value={z.maxMiles} onChange={(v) => set((d) => void (d.transit.zones[i].maxMiles = v))} compact />
-            <span className="text-ink-soft pt-5">→</span>
+            <span className="text-ink-soft pt-5">takes</span>
             <NumberField label={i === 0 ? 'Ground days' : undefined} value={z.days} min={1} max={10} onChange={(v) => set((d) => void (d.transit.zones[i].days = v))} compact />
           </div>
         ))}

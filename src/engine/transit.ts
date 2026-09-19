@@ -40,7 +40,7 @@ export function estimateTransitDays(
 ): TransitEstimate {
   const nonContiguous = !!state && (NON_CONTIGUOUS.has(state) || MILITARY.has(state))
   if (service === 'pickup') {
-    return { days: 0, basis: 'Store pickup — never enters a carrier network', nonContiguous: false }
+    return { days: 0, basis: 'Store pickup, never enters a carrier network', nonContiguous: false }
   }
   if (service === 'overnight') {
     return { days: settings.transit.overnightDays, basis: 'Next Day Air', nonContiguous }
@@ -52,11 +52,11 @@ export function estimateTransitDays(
     return { days: settings.transit.farDays, basis: MILITARY.has(state!) ? `Military mail to ${state}` : `Ground to ${state}`, nonContiguous }
   }
   if (distanceMiles === null) {
-    return { days: settings.transit.farDays, basis: 'Distance unknown — assumed longest ground transit', nonContiguous }
+    return { days: settings.transit.farDays, basis: 'Distance unknown, assumed longest ground transit', nonContiguous }
   }
   for (const zone of settings.transit.zones) {
     if (distanceMiles <= zone.maxMiles) {
-      return { days: zone.days, basis: `Ground, ${Math.round(distanceMiles)} mi (≤${zone.maxMiles} mi zone)`, nonContiguous }
+      return { days: zone.days, basis: `Ground, ${Math.round(distanceMiles)} mi (up to ${zone.maxMiles} mi zone)`, nonContiguous }
     }
   }
   return { days: settings.transit.farDays, basis: `Ground, ${Math.round(distanceMiles)} mi (beyond last zone)`, nonContiguous }

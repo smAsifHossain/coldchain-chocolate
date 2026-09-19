@@ -83,7 +83,7 @@ function parseShopify(rows: Row[], includeFulfilled: boolean): Omit<ImportResult
 
 function parseGenericCsv(rows: Row[], columns: string[]): Omit<ImportResult, 'columns'> {
   const zipCol = findColumn(columns, /zip|postal/i)
-  if (!zipCol) throw new Error(`No zip column found. Columns: ${columns.join(', ')}`)
+  if (!zipCol) throw new Error(`No zip column found. The columns are ${columns.join(', ')}.`)
   const idCol = findColumn(columns, /^(order|order ?(id|#|number|name)|name|id)$/i)
   const qtyCol = findColumn(columns, /qty|quantity|pieces|items/i)
   const methodCol = findColumn(columns, /shipping ?method|service|carrier/i)

@@ -212,9 +212,9 @@ export function useApp() {
     setCtx(next)
     const message =
       fetched.missing.length > 0 && fetched.forecasts.size === 0
-        ? 'Neither forecast service could be reached and nothing is cached. Decisions default to the safest tier — check the weather by hand.'
+        ? 'Neither forecast service could be reached and nothing is cached. Decisions default to the safest tier, so check the weather by hand.'
         : fetched.stale.length > 0
-          ? 'The forecast services could not be reached. Showing the last saved forecast — re-run when you are back online.'
+          ? 'The forecast services could not be reached. Showing the last saved forecast. Re-run when you are back online.'
           : fetched.fallback.length > 0
             ? 'Open-Meteo was unreachable, so these forecasts come from the National Weather Service (7 days instead of 16).'
             : null

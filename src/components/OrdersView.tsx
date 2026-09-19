@@ -30,7 +30,16 @@ export function OrdersView({ app, onGoToPackList }: { app: AppApi; onGoToPackLis
   )
 }
 
-/** What is on the bench right now — recomputed from state, so the checkbox and filters read true. */
+/** "15:00" as "3 PM", "15:30" as "3.30 PM". */
+function clockLabel(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  if (!Number.isFinite(h)) return hhmm
+  const suffix = h >= 12 ? 'PM' : 'AM'
+  const hour = h % 12 === 0 ? 12 : h % 12
+  return m ? `${hour}.${String(m).padStart(2, '0')} ${suffix}` : `${hour} ${suffix}`
+}
+
+/** What is on the bench right now, recomputed from state so the checkbox and filters read true. */
 function StatusLine({ app }: { app: AppApi }) {
   if (app.allOrders.length === 0) return null
   const n = app.orders.length
@@ -42,7 +51,7 @@ function StatusLine({ app }: { app: AppApi }) {
   if (noZip > 0) parts.push(`${noZip} without a zip`)
   return (
     <p className="text-sm" role="status">
-      {parts.join(' — ')}
+      {parts.join('. ')}.
     </p>
   )
 }
@@ -125,7 +134,7 @@ function InputDock({ app }: { app: AppApi }) {
         />
         {app.cutoff.afterCutoff && app.shipDate === app.cutoff.date && (
           <p className="text-sm text-foil" role="status">
-            Past today's {app.settings.pickupCutoff} pickup — planning for {formatShort(app.shipDate)}.
+            Past today's {clockLabel(app.settings.pickupCutoff)} pickup, so planning for {formatShort(app.shipDate)}.
           </p>
         )}
         <p className="text-ink-faint text-xs">Forecasts reach 16 days out; confidence drops after 7.</p>
@@ -137,7 +146,7 @@ function InputDock({ app }: { app: AppApi }) {
       {!app.zipDb && !app.zipError && <p className="text-ink-faint text-xs">Loading the zip code table…</p>}
       {app.zipError && (
         <p className="text-sm text-hot" role="alert">
-          The zip table failed to load: {app.zipError}. Reload the page.
+          The zip table failed to load ({app.zipError}). Reload the page.
         </p>
       )}
       {app.allOrders.length > 0 && (
@@ -220,7 +229,7 @@ function Results({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => v
       <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-line no-print">
         <h2 className="display text-lg">Decisions</h2>
         {app.needsRefetch && (
-          <span className="text-sm text-hot">Origin or route settings changed — rebuild to fetch the new forecasts.</span>
+          <span className="text-sm text-hot">Origin or route settings changed. Rebuild to fetch the new forecasts.</span>
         )}
         {app.run.message && (
           <span className="text-sm text-hot" role="status">
@@ -337,7 +346,7 @@ function Row({ line, app, open, onToggle, index }: { line: PackLine; app: AppApi
           {line.order.customer && <div className="text-ink-soft text-sm">{line.order.customer}</div>}
         </td>
         <td>
-          <div>{d.place || '—'}</div>
+          <div>{d.place || 'unknown'}</div>
           <div className="text-ink-soft text-sm">{d.zip}</div>
         </td>
         <td>
@@ -356,7 +365,7 @@ function Row({ line, app, open, onToggle, index }: { line: PackLine; app: AppApi
               <TripStrip decision={d} />
             </>
           ) : (
-            <span className="text-ink-faint">—</span>
+            <span className="text-ink-faint">not judged</span>
           )}
         </td>
         <td>
@@ -455,15 +464,15 @@ function Details({ line, app }: { line: PackLine; app: AppApi }) {
         )}
         {line.order.lineItems && line.order.lineItems.length > 0 && (
           <div className="text-sm text-ink-soft">
-            In the box: {line.order.lineItems.join(', ')} ({line.order.qty} piece{line.order.qty === 1 ? '' : 's'})
+            <span className="font-semibold">In the box</span> {line.order.lineItems.join(', ')} ({line.order.qty} piece{line.order.qty === 1 ? '' : 's'})
           </div>
         )}
         {line.order.shippingMethod && (
           <div className="text-sm text-ink-soft">
-            On the order: “{line.order.shippingMethod}” — read as {SERVICE_LABEL[d.serviceLevel]}
+            The order says “{line.order.shippingMethod}”, read as {SERVICE_LABEL[d.serviceLevel]}.
           </div>
         )}
-        <div className="text-sm text-ink-soft">Forecast confidence: {d.confidence}</div>
+        <div className="text-sm text-ink-soft">Forecast confidence is {d.confidence}.</div>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -486,8 +495,8 @@ function Details({ line, app }: { line: PackLine; app: AppApi }) {
                     <td className="pr-3">
                       {p.place} <span className="text-ink-faint">({p.role === 'transit' ? 'in transit' : p.role})</span>
                     </td>
-                    <td className="pr-3">{p.high === null ? '—' : `${Math.round(p.high)}°`}</td>
-                    <td>{p.low === null ? '—' : `${Math.round(p.low)}°`}</td>
+                    <td className="pr-3">{p.high === null ? 'none' : `${Math.round(p.high)}°`}</td>
+                    <td>{p.low === null ? 'none' : `${Math.round(p.low)}°`}</td>
                   </tr>
                 ))}
               </tbody>

@@ -198,7 +198,7 @@ export async function getForecasts(points: GeoPoint[], options: FetchOptions = {
             }
           } catch (e) {
             nwsFailed = true
-            result.errors.push(`NWS: ${e instanceof Error ? e.message : String(e)}`)
+            result.errors.push(`NWS failed (${e instanceof Error ? e.message : String(e)})`)
           }
         }
         const cached = cache?.get(key)

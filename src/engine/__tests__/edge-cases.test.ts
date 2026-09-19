@@ -104,7 +104,7 @@ describe('product rules', () => {
     expect(bars.tier).toBe('single')
     expect(truffles.tier).toBe('double')
     expect(truffles.thresholds.double).toBe(75)
-    expect(truffles.reasons.join(' ')).toMatch(/thresholds lowered 5°F/)
+    expect(truffles.reasons.join(' ')).toMatch(/lowered 5°F/)
   })
   it('ignore a broken pattern instead of crashing', () => {
     const s = structuredClone(DEFAULT_SETTINGS)
@@ -171,6 +171,6 @@ describe('NWS fallback', () => {
     const r = await getForecasts([A], { fetchImpl: allDown, cache, now: 9000, ttlMs: 10 })
     expect(r.forecasts.get(pointKey(A))!.stale).toBe(true)
     expect(r.fallback).toEqual([])
-    expect(r.errors.some((e) => e.startsWith('NWS:'))).toBe(true)
+    expect(r.errors.some((e) => e.startsWith('NWS failed'))).toBe(true)
   })
 })

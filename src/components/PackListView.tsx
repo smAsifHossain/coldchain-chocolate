@@ -34,7 +34,7 @@ export function PackListView({ app }: { app: AppApi }) {
           <h2 className="display text-2xl md:text-3xl">{formatLong(app.shipDate)}</h2>
           <div className="text-ink-soft text-sm mt-1">
             Built {generated.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} from {app.origin.city}, {app.origin.state}
-            {app.run.stale ? ' — using a saved forecast; the live services were unreachable' : app.run.fallback ? ' — forecasts from the National Weather Service' : ''}
+            {app.run.stale ? '. Using a saved forecast because the live services were unreachable' : app.run.fallback ? '. Forecasts from the National Weather Service' : ''}
           </div>
         </div>
         <div className="flex gap-2 no-print">
@@ -76,7 +76,7 @@ export function PackListView({ app }: { app: AppApi }) {
 
       <footer className="pt-4 text-ink-faint text-xs">
         Worst-case temperatures cover the ship day at origin, every day in transit, delivery day and {app.settings.porchDays} day
-        {app.settings.porchDays === 1 ? '' : 's'} after delivery (the porch day). Thresholds: single thermal from {app.settings.thresholds.single}°F, double thermal with ice from{' '}
+        {app.settings.porchDays === 1 ? '' : 's'} after delivery (the porch day). Thresholds are single thermal from {app.settings.thresholds.single}°F, double thermal with ice from{' '}
         {app.settings.thresholds.double}°F{strictest > 0 ? `; sensitive products judged up to ${strictest}°F stricter` : ''}. Forecast by Open-Meteo
         {app.run.fallback ? ' and the National Weather Service' : ''}.
       </footer>
@@ -140,19 +140,19 @@ function Group({ title, lines, app, tone }: { title: string; lines: PackLine[]; 
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="font-semibold text-lg">
                     {d.orderId}
-                    {boxes > 1 && <span className="text-ink-soft text-sm font-normal"> — {boxes} boxes</span>}
+                    {boxes > 1 && <span className="text-ink-soft text-sm font-normal">, {boxes} boxes</span>}
                   </div>
                   <TierStamp tier={effectiveTier(line)} status={d.status} />
                 </div>
                 <div className="text-sm">
                   {line.order.customer ? `${line.order.customer}, ` : ''}
-                  {d.place || '—'} {d.zip}
+                  {d.place || 'unknown'} {d.zip}
                 </div>
                 <div className="display text-lg mt-1">Pull {pullText(line, app)}</div>
                 <div className="text-ink-soft text-sm">
                   {shippingLines(d).main}
                   {shippingLines(d).sub ? `, ${shippingLines(d).sub}` : ''}
-                  {d.worst ? ` — worst ${Math.round(d.worst.high!)}°F ${d.worst.place}, ${formatShort(d.worst.date)}${worstRoleNote(d)}` : ''}
+                  {d.worst ? `. Worst ${Math.round(d.worst.high!)}°F ${d.worst.place}, ${formatShort(d.worst.date)}${worstRoleNote(d)}` : ''}
                 </div>
                 {line.order.lineItems && line.order.lineItems.length > 0 && <div className="text-ink-faint text-xs mt-1">{line.order.lineItems.join(', ')}</div>}
                 {notesFor(line).map((n, i) => (
@@ -205,7 +205,7 @@ function Group({ title, lines, app, tone }: { title: string; lines: PackLine[]; 
                     {boxes > 1 && <div className="text-sm font-semibold">{boxes} boxes</div>}
                   </td>
                   <td>
-                    <div>{d.place || '—'}</div>
+                    <div>{d.place || 'unknown'}</div>
                     <div className="text-ink-soft text-sm">{d.zip}</div>
                   </td>
                   <td>
@@ -225,7 +225,7 @@ function Group({ title, lines, app, tone }: { title: string; lines: PackLine[]; 
                         </div>
                       </>
                     ) : (
-                      '—'
+                      'not judged'
                     )}
                   </td>
                   <td className="text-sm max-w-[22rem]">
