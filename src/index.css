@@ -349,13 +349,57 @@ table.bench tr:last-child td {
 
 .strip {
   display: inline-flex;
+  gap: 3px;
+}
+.strip > span {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 34px;
+  padding: 0 3px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
   gap: 2px;
 }
-.strip span {
+.strip .s-day {
+  opacity: 0.85;
+}
+.strip .s-temp {
+  font-size: 0.72rem;
+  letter-spacing: -0.02em;
+}
+.strip .s-missing {
+  color: var(--color-ink-faint);
+}
+.strip-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-left: 0.6em;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.strip-legend > span {
   display: inline-block;
-  width: 14px;
-  height: 22px;
-  border-radius: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.strip-legend .s-none {
+  background: var(--color-cold);
+  opacity: 0.55;
+}
+.strip-legend .s-single {
+  background: var(--color-foil);
+}
+.strip-legend .s-double {
+  background: var(--color-hot);
 }
 .strip .s-none {
   background: var(--color-cold);

@@ -17,7 +17,7 @@ import {
 } from '../engine'
 import type { AppApi } from '../app/useApp'
 import { TierStamp } from './TierStamp'
-import { TripStrip } from './TripStrip'
+import { TripLegend, TripStrip } from './TripStrip'
 import type { BuildStep } from '../app/useApp'
 
 export function OrdersView({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => void }) {
@@ -269,7 +269,10 @@ function Results({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => v
               <th scope="col">Destination</th>
               <th scope="col">Shipping method</th>
               <th scope="col">Arrives</th>
-              <th scope="col">Trip</th>
+              <th scope="col">
+                Trip, day by day
+                <TripLegend />
+              </th>
               <th scope="col">Worst case</th>
               <th scope="col">Pack</th>
               <th scope="col">Pull</th>
