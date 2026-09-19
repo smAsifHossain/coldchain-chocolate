@@ -444,13 +444,3 @@ export function findBetterShipDate(
   }
   return null
 }
-
-/** Tier for each of the next `days` ship dates — the planner grid. */
-export function planShipDays(order: Order, ctx: DecideContext, days = 7): { shipDate: ISODate; decision: Decision }[] {
-  const out: { shipDate: ISODate; decision: Decision }[] = []
-  for (let i = 0; i < days; i++) {
-    const shipDate = addDays(ctx.shipDate, i)
-    out.push({ shipDate, decision: decide(order, ctx, { noAlternatives: true, shipDateOverride: shipDate }) })
-  }
-  return out
-}

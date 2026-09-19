@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decide, findBetterShipDate, materialsFor, planShipDays, pointsForOrder } from '../decide'
+import { decide, findBetterShipDate, materialsFor, pointsForOrder } from '../decide'
 import { midpoint } from '../zip'
 import { DEFAULT_SETTINGS } from '../settings'
 import type { Order } from '../types'
@@ -252,11 +252,5 @@ describe('planner and prefetch', () => {
     c.settings.routeWaypoint = false
     expect(pointsForOrder(order('85004'), c)).toHaveLength(2)
     expect(pointsForOrder(order('00000'), ctx())).toHaveLength(0)
-  })
-  it('planShipDays returns one decision per day', () => {
-    const plan = planShipDays(order('67206'), ctx({ forecasts: flat('67206', 60, 60) }), 7)
-    expect(plan).toHaveLength(7)
-    expect(plan[0].shipDate).toBe(TODAY)
-    expect(plan.every((p) => p.decision.recommendation === null)).toBe(true)
   })
 })
