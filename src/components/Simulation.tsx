@@ -93,8 +93,31 @@ export function Simulation({ app }: { app: AppApi }) {
   const [forecasts, setForecasts] = useState<ForecastMap>(new Map())
   const [fetchState, setFetchState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [frame, setFrame] = useState(-1)
+  const [seen, setSeen] = useState(false)
+  const sectionRef = useRef<HTMLElement>(null)
   const cache = useRef(sharedForecastCache())
   const timer = useRef<number | null>(null)
+
+  // Hold the trip at the start until the section scrolls into view, then play once on its own.
+  useEffect(() => {
+    const el = sectionRef.current
+    if (!el || seen) return
+    if (!('IntersectionObserver' in window)) {
+      setSeen(true)
+      return
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setSeen(true)
+          io.disconnect()
+        }
+      },
+      { threshold: 0.35 },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [seen])
 
   const shipChoices = useMemo(() => {
     const out: string[] = []
@@ -146,11 +169,11 @@ export function Simulation({ app }: { app: AppApi }) {
   const cols = useMemo(() => (decision ? columns(decision, settings.thresholds) : []), [decision, settings.thresholds])
   const worstIdx = decision?.worst ? cols.findIndex((c) => c.date === decision.worst!.date) : -1
 
-  // Play the trip every time the decision changes.
+  // Play the trip when it first comes into view, and again every time the decision changes.
   useEffect(() => {
     if (timer.current) window.clearInterval(timer.current)
     setFrame(-1)
-    if (!decision || cols.length === 0) return
+    if (!seen || !decision || cols.length === 0) return
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduced) {
       setFrame(cols.length)
@@ -168,7 +191,7 @@ export function Simulation({ app }: { app: AppApi }) {
     return () => {
       if (timer.current) window.clearInterval(timer.current)
     }
-  }, [decision, cols.length])
+  }, [decision, cols.length, seen])
 
   const replay = () => {
     if (timer.current) window.clearInterval(timer.current)
@@ -199,7 +222,7 @@ export function Simulation({ app }: { app: AppApi }) {
   const originLabel = `${origin.city}, ${origin.state}`
 
   return (
-    <section className="thermal" aria-label="Simulation">
+    <section className="thermal" aria-label="Simulation" ref={sectionRef}>
       <div className="mx-auto max-w-7xl px-4 md:px-6 py-10 md:py-14 flex flex-col gap-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
