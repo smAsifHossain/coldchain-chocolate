@@ -1,6 +1,7 @@
-import { boxesFor, effectiveTier, formatLong, formatShort, lineMaterials, SERVICE_LABEL, sortForBench, summarize, tierOverridden, TIER_LABEL, type PackLine, type Tier } from '../engine'
+import { boxesFor, effectiveTier, formatLong, formatShort, lineMaterials, sortForBench, summarize, tierOverridden, TIER_LABEL, type PackLine, type Tier } from '../engine'
 import type { AppApi } from '../app/useApp'
 import { TierStamp } from './TierStamp'
+import { ShippingCell, shippingLines } from './ShippingCell'
 import { worstRoleNote } from './TripStrip'
 
 const TIER_ORDER: Tier[] = ['double', 'single', 'none']
@@ -149,8 +150,8 @@ function Group({ title, lines, app, tone }: { title: string; lines: PackLine[]; 
                 </div>
                 <div className="display text-lg mt-1">Pull {pullText(line, app)}</div>
                 <div className="text-ink-soft text-sm">
-                  {line.order.shippingMethod || SERVICE_LABEL[d.serviceLevel]}
-                  {d.status === 'ok' ? `, arrives ${formatShort(d.deliveryDate)}` : ''}
+                  {shippingLines(d).main}
+                  {shippingLines(d).sub ? `, ${shippingLines(d).sub}` : ''}
                   {d.worst ? ` — worst ${Math.round(d.worst.high!)}°F ${d.worst.place}, ${formatShort(d.worst.date)}${worstRoleNote(d)}` : ''}
                 </div>
                 {line.order.lineItems && line.order.lineItems.length > 0 && <div className="text-ink-faint text-xs mt-1">{line.order.lineItems.join(', ')}</div>}
@@ -175,7 +176,7 @@ function Group({ title, lines, app, tone }: { title: string; lines: PackLine[]; 
               </th>
               <th scope="col">Order</th>
               <th scope="col">Destination</th>
-              <th scope="col">Shipping method</th>
+              <th scope="col">Shipping</th>
               <th scope="col">Pull</th>
               <th scope="col">Worst case</th>
               <th scope="col">Notes</th>
@@ -208,11 +209,7 @@ function Group({ title, lines, app, tone }: { title: string; lines: PackLine[]; 
                     <div className="text-ink-soft text-sm">{d.zip}</div>
                   </td>
                   <td>
-                    <div>{line.order.shippingMethod || SERVICE_LABEL[d.serviceLevel]}</div>
-                    <div className="text-ink-soft text-sm">
-                      {SERVICE_LABEL[d.serviceLevel]}
-                      {d.status === 'ok' ? `, arrives ${formatShort(d.deliveryDate)}` : ''}
-                    </div>
+                    <ShippingCell decision={d} />
                   </td>
                   <td className="whitespace-nowrap">
                     <TierStamp tier={effectiveTier(line)} status={d.status} />

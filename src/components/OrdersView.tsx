@@ -17,6 +17,7 @@ import {
 } from '../engine'
 import type { AppApi } from '../app/useApp'
 import { TierStamp } from './TierStamp'
+import { ShippingCell } from './ShippingCell'
 import { TripStrip, worstRoleNote } from './TripStrip'
 import type { BuildStep } from '../app/useApp'
 
@@ -267,8 +268,7 @@ function Results({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => v
             <tr>
               <th scope="col">Order</th>
               <th scope="col">Destination</th>
-              <th scope="col">Shipping method</th>
-              <th scope="col">Arrives</th>
+              <th scope="col">Shipping</th>
               <th scope="col">Worst case</th>
               <th scope="col">Pack</th>
               <th scope="col">Pull</th>
@@ -341,13 +341,8 @@ function Row({ line, app, open, onToggle, index }: { line: PackLine; app: AppApi
           <div className="text-ink-soft text-sm">{d.zip}</div>
         </td>
         <td>
-          <div>{line.order.shippingMethod || SERVICE_LABEL[d.serviceLevel]}</div>
-          <div className="text-ink-soft text-sm">
-            {SERVICE_LABEL[d.serviceLevel]}
-            {d.status === 'ok' ? `, ${d.transitDays} day${d.transitDays === 1 ? '' : 's'}` : ''}
-          </div>
+          <ShippingCell decision={d} />
         </td>
-        <td>{d.status === 'ok' ? formatShort(d.deliveryDate) : '—'}</td>
         <td>
           {d.worst ? (
             <>
@@ -402,7 +397,7 @@ function Row({ line, app, open, onToggle, index }: { line: PackLine; app: AppApi
       </tr>
       {open && (
         <tr id={panelId}>
-          <td colSpan={8} className="bg-stone">
+          <td colSpan={7} className="bg-stone">
             <Details line={line} app={app} />
           </td>
         </tr>
@@ -461,6 +456,11 @@ function Details({ line, app }: { line: PackLine; app: AppApi }) {
         {line.order.lineItems && line.order.lineItems.length > 0 && (
           <div className="text-sm text-ink-soft">
             In the box: {line.order.lineItems.join(', ')} ({line.order.qty} piece{line.order.qty === 1 ? '' : 's'})
+          </div>
+        )}
+        {line.order.shippingMethod && (
+          <div className="text-sm text-ink-soft">
+            On the order: “{line.order.shippingMethod}” — read as {SERVICE_LABEL[d.serviceLevel]}
           </div>
         )}
         <div className="text-sm text-ink-soft">Forecast confidence: {d.confidence}</div>
