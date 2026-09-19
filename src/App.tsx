@@ -17,12 +17,14 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'packlist', label: 'Pack list' },
   { id: 'planner', label: 'Which day' },
   { id: 'settings', label: 'Settings' },
-  { id: 'about', label: 'How it decides' },
 ]
+
+/** Reachable from the footer and the home page, not the main navigation. */
+const QUIET_TABS: Tab[] = ['about']
 
 function tabFromHash(): Tab {
   const h = window.location.hash.replace('#', '') as Tab
-  return TABS.some((t) => t.id === h) ? h : 'home'
+  return TABS.some((t) => t.id === h) || QUIET_TABS.includes(h) ? h : 'home'
 }
 
 export default function App() {
@@ -74,6 +76,9 @@ export default function App() {
       </main>
 
       <footer className="no-print mx-auto w-full max-w-7xl px-4 md:px-6 py-4 text-ink-faint text-xs flex flex-wrap gap-x-4 gap-y-1">
+        <button className={`underline ${tab === 'about' ? 'text-ink' : ''}`} onClick={() => go('about')}>
+          How it decides, and where it breaks
+        </button>
         <span>Built for the WSU Chocolathon, September 2026.</span>
         <span>
           Forecasts by{' '}
