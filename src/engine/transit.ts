@@ -17,8 +17,8 @@ export function parseServiceLevel(method: string | undefined | null): ServiceLev
 
 export const SERVICE_LABEL: Record<ServiceLevel, string> = {
   ground: 'Ground',
-  two_day: '2-Day',
-  overnight: 'Overnight',
+  two_day: '2-Day Air',
+  overnight: 'Next Day Air',
   pickup: 'Store pickup',
 }
 
@@ -43,10 +43,10 @@ export function estimateTransitDays(
     return { days: 0, basis: 'Store pickup — never enters a carrier network', nonContiguous: false }
   }
   if (service === 'overnight') {
-    return { days: settings.transit.overnightDays, basis: 'Overnight service', nonContiguous }
+    return { days: settings.transit.overnightDays, basis: 'Next Day Air', nonContiguous }
   }
   if (service === 'two_day') {
-    return { days: settings.transit.twoDayDays, basis: '2-Day service', nonContiguous }
+    return { days: settings.transit.twoDayDays, basis: '2-Day Air', nonContiguous }
   }
   if (nonContiguous) {
     return { days: settings.transit.farDays, basis: MILITARY.has(state!) ? `Military mail to ${state}` : `Ground to ${state}`, nonContiguous }

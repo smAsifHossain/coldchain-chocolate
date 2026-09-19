@@ -99,10 +99,10 @@ export function SettingsView({ app }: { app: AppApi }) {
           </div>
         ))}
         <NumberField label="Beyond that, and Alaska / Hawaii" value={s.transit.farDays} min={1} max={10} onChange={(v) => set((d) => void (d.transit.farDays = v))} suffix="days" />
-        <NumberField label="2-Day service" value={s.transit.twoDayDays} min={1} max={5} onChange={(v) => set((d) => void (d.transit.twoDayDays = v))} suffix="days" />
-        <NumberField label="Overnight service" value={s.transit.overnightDays} min={1} max={3} onChange={(v) => set((d) => void (d.transit.overnightDays = v))} suffix="days" />
+        <NumberField label="2-Day Air" value={s.transit.twoDayDays} min={1} max={5} onChange={(v) => set((d) => void (d.transit.twoDayDays = v))} suffix="days" />
+        <NumberField label="Next Day Air" value={s.transit.overnightDays} min={1} max={3} onChange={(v) => set((d) => void (d.transit.overnightDays = v))} suffix="days" />
         <NumberField
-          label="Suggest expediting a double-thermal box in transit for"
+          label="Suggest 2-Day Air for a double-thermal box in transit for"
           value={s.longHotTransitDays}
           min={2}
           max={10}

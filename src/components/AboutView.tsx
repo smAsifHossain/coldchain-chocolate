@@ -61,7 +61,7 @@ export function AboutView({ app }: { app: AppApi }) {
             </li>
             <li>
               <strong>Estimate the trip.</strong> Distance from {app.origin.city} sets ground transit days ({s.transit.zones.map((z) => `≤${z.maxMiles} mi: ${z.days}`).join(', ')}, farther: {s.transit.farDays}).
-              2-Day and Overnight orders use their service; store pickups have no trip at all. Delivery skips Sundays{s.saturdayDelivery ? '' : ', Saturdays'}
+              2-Day Air and Next Day Air orders use their service; store pickups have no trip at all. Delivery skips Sundays{s.saturdayDelivery ? '' : ', Saturdays'}
               {s.observeHolidays ? ' and the six carrier holidays' : ''}; after the {s.pickupCutoff} pickup, “today” means the next carrier day.
             </li>
             <li>
@@ -187,7 +187,7 @@ function WhatIf({ app }: { app: AppApi }) {
           </div>
           {tooHot && <div className="text-sm text-hot">At or above {t.hold}°F: the planner would suggest a faster service or a cooler ship day.</div>}
           {tier === 'double' && days >= s.longHotTransitDays && !tooHot && (
-            <div className="text-sm text-hot">{days} days on ice is a long trip: the planner would suggest 2-Day service.</div>
+            <div className="text-sm text-hot">{days} days on ice is a long trip: the planner would suggest 2-Day Air.</div>
           )}
         </div>
       </div>

@@ -429,7 +429,7 @@ function Details({ line, app }: { line: PackLine; app: AppApi }) {
       <div className="flex flex-col gap-3">
         {d.recommendation && (
           <div className="border-l-4 border-hot pl-3">
-            <div className="font-semibold text-hot">{d.recommendation.action === 'hold' ? 'Consider holding' : 'Consider a faster service'}</div>
+            <div className="font-semibold text-hot">{d.recommendation.action === 'hold' ? 'Consider holding' : 'Consider air service'}</div>
             <p className="text-sm">{d.recommendation.detail}</p>
           </div>
         )}
