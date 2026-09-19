@@ -50,11 +50,3 @@ export function TripStrip({ decision: d }: { decision: Decision }) {
   )
 }
 
-/** Explains the strip once, in the column header. */
-export function TripLegend() {
-  return (
-    <span className="strip-legend" aria-hidden="true">
-      <span className="s-none" /> cool <span className="s-single" /> single <span className="s-double" /> double <span className="s-double s-porch" /> porch day
-    </span>
-  )
-}

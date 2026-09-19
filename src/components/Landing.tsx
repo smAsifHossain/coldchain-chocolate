@@ -84,8 +84,8 @@ function Hero({ app, onOpenPlanner, onDemo }: Pick<Props, 'app' | 'onOpenPlanner
     <section className="mx-auto w-full max-w-7xl px-4 md:px-6 pt-10 pb-12 md:pt-16 md:pb-16 grid gap-10 lg:grid-cols-[3fr_2fr] lg:items-center" aria-label="Introduction">
       <div className="flex flex-col gap-6">
         <h1 className="display text-4xl md:text-6xl max-w-[16ch]">
-          Know if the chocolate will melt on the way to{' '}
-          <span className="whitespace-nowrap">
+          Know if the chocolate will melt on the way to
+          <span className="block whitespace-nowrap">
             <span className="city-swap" key={current?.zip ?? 'none'} aria-live="polite" style={{ color: cityColor }}>
               {current?.city ?? 'anywhere'}
             </span>
