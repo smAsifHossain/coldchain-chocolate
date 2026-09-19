@@ -1,6 +1,7 @@
 import { boxesFor, effectiveTier, formatLong, formatShort, lineMaterials, SERVICE_LABEL, sortForBench, summarize, tierOverridden, TIER_LABEL, type PackLine, type Tier } from '../engine'
 import type { AppApi } from '../app/useApp'
 import { TierStamp } from './TierStamp'
+import { worstRoleNote } from './TripStrip'
 
 const TIER_ORDER: Tier[] = ['double', 'single', 'none']
 
@@ -150,7 +151,7 @@ function Group({ title, lines, app, tone }: { title: string; lines: PackLine[]; 
                 <div className="text-ink-soft text-sm">
                   {line.order.shippingMethod || SERVICE_LABEL[d.serviceLevel]}
                   {d.status === 'ok' ? `, arrives ${formatShort(d.deliveryDate)}` : ''}
-                  {d.worst ? ` — worst ${Math.round(d.worst.high!)}°F ${d.worst.place}, ${formatShort(d.worst.date)}` : ''}
+                  {d.worst ? ` — worst ${Math.round(d.worst.high!)}°F ${d.worst.place}, ${formatShort(d.worst.date)}${worstRoleNote(d)}` : ''}
                 </div>
                 {line.order.lineItems && line.order.lineItems.length > 0 && <div className="text-ink-faint text-xs mt-1">{line.order.lineItems.join(', ')}</div>}
                 {notesFor(line).map((n, i) => (
@@ -223,6 +224,7 @@ function Group({ title, lines, app, tone }: { title: string; lines: PackLine[]; 
                         <div className="font-bold">{Math.round(d.worst.high!)}°F</div>
                         <div className="text-ink-soft text-sm">
                           {d.worst.place}, {formatShort(d.worst.date)}
+                          {worstRoleNote(d)}
                         </div>
                       </>
                     ) : (

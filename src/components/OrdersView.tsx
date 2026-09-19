@@ -17,7 +17,7 @@ import {
 } from '../engine'
 import type { AppApi } from '../app/useApp'
 import { TierStamp } from './TierStamp'
-import { TripLegend, TripStrip } from './TripStrip'
+import { TripLegend, TripStrip, worstRoleNote } from './TripStrip'
 import type { BuildStep } from '../app/useApp'
 
 export function OrdersView({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => void }) {
@@ -270,10 +270,9 @@ function Results({ app, onGoToPackList }: { app: AppApi; onGoToPackList: () => v
               <th scope="col">Shipping method</th>
               <th scope="col">Arrives</th>
               <th scope="col">
-                Trip, day by day
+                Worst case
                 <TripLegend />
               </th>
-              <th scope="col">Worst case</th>
               <th scope="col">Pack</th>
               <th scope="col">Pull</th>
               <th scope="col">
@@ -353,9 +352,6 @@ function Row({ line, app, open, onToggle, index }: { line: PackLine; app: AppApi
         </td>
         <td>{d.status === 'ok' ? formatShort(d.deliveryDate) : '—'}</td>
         <td>
-          <TripStrip decision={d} />
-        </td>
-        <td>
           {d.worst ? (
             <>
               <div className={`temp ${tier === 'double' ? 'text-hot' : tier === 'single' ? 'text-foil' : 'text-cold'}`}>
@@ -363,7 +359,9 @@ function Row({ line, app, open, onToggle, index }: { line: PackLine; app: AppApi
               </div>
               <div className="text-ink-soft text-sm">
                 {d.worst.place}, {formatShort(d.worst.date)}
+                {worstRoleNote(d)}
               </div>
+              <TripStrip decision={d} />
             </>
           ) : (
             <span className="text-ink-faint">—</span>
@@ -407,7 +405,7 @@ function Row({ line, app, open, onToggle, index }: { line: PackLine; app: AppApi
       </tr>
       {open && (
         <tr id={panelId}>
-          <td colSpan={9} className="bg-stone">
+          <td colSpan={8} className="bg-stone">
             <Details line={line} app={app} />
           </td>
         </tr>
