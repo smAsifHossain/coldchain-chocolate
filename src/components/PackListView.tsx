@@ -75,7 +75,7 @@ export function PackListView({ app }: { app: AppApi }) {
 
       <footer className="pt-4 text-ink-faint text-xs">
         Worst-case temperatures cover the ship day at origin, every day in transit, delivery day and {app.settings.porchDays} day
-        {app.settings.porchDays === 1 ? '' : 's'} on the porch. Thresholds: single thermal from {app.settings.thresholds.single}°F, double thermal with ice from{' '}
+        {app.settings.porchDays === 1 ? '' : 's'} after delivery (the porch day). Thresholds: single thermal from {app.settings.thresholds.single}°F, double thermal with ice from{' '}
         {app.settings.thresholds.double}°F{strictest > 0 ? `; sensitive products judged up to ${strictest}°F stricter` : ''}. Forecast by Open-Meteo
         {app.run.fallback ? ' and the National Weather Service' : ''}.
       </footer>

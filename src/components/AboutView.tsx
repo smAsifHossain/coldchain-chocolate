@@ -69,7 +69,7 @@ export function AboutView({ app }: { app: AppApi }) {
               one request for the whole batch, no account or key. If Open-Meteo is down, the National Weather Service fills in.
             </li>
             <li>
-              <strong>Build the exposure window.</strong> Ship day at origin, every day in transit, delivery day at the destination, and {s.porchDays} day{s.porchDays === 1 ? '' : 's'} on the porch.
+              <strong>Build the exposure window.</strong> Ship day at origin, every day in transit, delivery day at the destination, and {s.porchDays} day{s.porchDays === 1 ? '' : 's'} after delivery, in case the box sits outside.
             </li>
             <li>
               <strong>Take the worst case.</strong> The highest daily high anywhere in that window decides the tier: below {s.thresholds.single}°F no thermal, from {s.thresholds.single}°F a single

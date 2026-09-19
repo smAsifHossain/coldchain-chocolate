@@ -73,7 +73,7 @@ function roleLabel(c: DayCol, origin: string): string {
     case 'destination':
       return 'delivered'
     case 'porch':
-      return 'on the porch'
+      return 'day after delivery'
   }
 }
 

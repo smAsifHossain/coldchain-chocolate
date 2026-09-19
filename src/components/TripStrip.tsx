@@ -5,13 +5,13 @@ const ROLE_TEXT: Record<ExposureRole, string> = {
   route: 'in transit',
   transit: 'in transit',
   destination: 'delivery day',
-  porch: 'on the porch, the day after delivery',
+  porch: 'day after delivery, in case the box sits outside',
 }
 
 /** "ship day" / "on the porch" for the worst-case line; nothing for ordinary transit or delivery days. */
 export function worstRoleNote(d: Decision): string {
   if (!d.worst) return ''
-  if (d.worst.role === 'porch') return ', on the porch'
+  if (d.worst.role === 'porch') return ', day after delivery'
   if (d.worst.role === 'origin' && d.serviceLevel !== 'pickup') return ', ship day'
   return ''
 }
