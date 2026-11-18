@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   addDays,
+  formatClock,
   boxesFor,
   effectiveTier,
   formatShort,
@@ -28,15 +29,6 @@ export function OrdersView({ app, onGoToPackList }: { app: AppApi; onGoToPackLis
       <Results app={app} onGoToPackList={onGoToPackList} />
     </div>
   )
-}
-
-/** "15:00" as "3 PM", "15:30" as "3.30 PM". */
-function clockLabel(hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number)
-  if (!Number.isFinite(h)) return hhmm
-  const suffix = h >= 12 ? 'PM' : 'AM'
-  const hour = h % 12 === 0 ? 12 : h % 12
-  return m ? `${hour}.${String(m).padStart(2, '0')} ${suffix}` : `${hour} ${suffix}`
 }
 
 /** What is on the bench right now, recomputed from state so the checkbox and filters read true. */
@@ -134,7 +126,7 @@ function InputDock({ app }: { app: AppApi }) {
         />
         {app.cutoff.afterCutoff && app.shipDate === app.cutoff.date && (
           <p className="text-sm text-foil" role="status">
-            Past today's {clockLabel(app.settings.pickupCutoff)} pickup, so planning for {formatShort(app.shipDate)}.
+            Past today's {formatClock(app.settings.pickupCutoff)} pickup, so planning for {formatShort(app.shipDate)}.
           </p>
         )}
         <p className="text-ink-faint text-xs">Forecasts reach 16 days out; confidence drops after 7.</p>

@@ -60,7 +60,7 @@ export default function App() {
       />
 
       <main id="main" tabIndex={-1} className={wide ? 'flex-1' : 'mx-auto w-full max-w-7xl px-4 md:px-6 py-5 flex flex-col gap-5 flex-1'}>
-        {tab === 'home' && <Landing app={app} onOpenPlanner={() => go('orders')} onDemo={demo} onAbout={() => go('about')} />}
+        {tab === 'home' && <Landing app={app} onOpenPlanner={() => go('orders')} onDemo={demo} />}
         {(tab === 'orders' || tab === 'packlist') && (
           <div className={tab === 'packlist' ? 'no-print' : undefined}>
             <DayStrip shipDate={app.shipDate} ctx={app.ctx} lines={app.lines} settings={app.settings} run={app.run} />
@@ -74,7 +74,7 @@ export default function App() {
 
       <footer className="no-print mx-auto w-full max-w-7xl px-4 md:px-6 py-4 text-ink-faint text-xs flex flex-wrap gap-x-4 gap-y-1">
         <button className={`underline ${tab === 'about' ? 'text-ink' : ''}`} onClick={() => go('about')}>
-          How it decides, and where it breaks
+          How it decides
         </button>
         <span>Built for the WSU Chocolathon, September 2026.</span>
         <span>

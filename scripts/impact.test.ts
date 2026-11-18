@@ -22,16 +22,28 @@ import type { DecideContext, Decision, LocationForecast, Order, Tier } from '../
 
 const ARCHIVE = 'https://archive-api.open-meteo.com/v1/archive'
 
-/** Real days from 2026, spread across the year so the numbers are not cherry-picked. */
+/**
+ * One mid-month Wednesday from each of the last twelve months, so the year is
+ * sampled evenly rather than cherry-picked for hot days.
+ */
 const SHIP_DATES = [
-  { date: '2026-01-14', label: 'January, deep winter' },
-  { date: '2026-04-15', label: 'April, shoulder season' },
-  { date: '2026-06-17', label: 'June, early summer' },
-  { date: '2026-07-15', label: 'July, peak summer' },
-  { date: '2026-08-19', label: 'August, late summer' },
-  { date: '2026-09-16', label: 'September, the week of the build' },
-  { date: '2026-10-14', label: 'October, cooling off' },
+  { date: '2025-11-12', label: 'November' },
+  { date: '2025-12-10', label: 'December' },
+  { date: '2026-01-14', label: 'January' },
+  { date: '2026-02-11', label: 'February' },
+  { date: '2026-03-11', label: 'March' },
+  { date: '2026-04-15', label: 'April' },
+  { date: '2026-05-13', label: 'May' },
+  { date: '2026-06-17', label: 'June' },
+  { date: '2026-07-15', label: 'July' },
+  { date: '2026-08-19', label: 'August' },
+  { date: '2026-09-16', label: 'September' },
+  { date: '2026-10-14', label: 'October' },
 ]
+
+/** Stated assumptions for the yearly projection. Everything else is measured. */
+const SHIPPING_DAYS_PER_YEAR = 250
+const SECONDS_PER_MANUAL_CHECK = 45
 
 const WINDOW_BEFORE = 1
 const WINDOW_AFTER = 12
@@ -158,9 +170,17 @@ describe('impact', () => {
         points.set(pointKey(mid), mid)
       }
 
+      // The archive publishes about a week behind, so skip any month whose
+      // window is not fully settled.
+      const safeEnd = new Date(Date.now() - 8 * 86_400_000).toISOString().slice(0, 10)
+      const months = SHIP_DATES.filter((s) => addDays(s.date, WINDOW_AFTER) <= safeEnd)
+      if (months.length < SHIP_DATES.length) {
+        console.log(`skipping ${SHIP_DATES.length - months.length} month(s) the archive has not published yet`)
+      }
+
       const pts = [...points.values()]
       const forecasts: ForecastMap = new Map()
-      for (const { date } of SHIP_DATES) {
+      for (const { date } of months) {
         const part = await fetchArchive(pts, addDays(date, -WINDOW_BEFORE), addDays(date, WINDOW_AFTER))
         for (const [k, v] of part) {
           const existing = forecasts.get(k)
@@ -170,7 +190,7 @@ describe('impact', () => {
       }
 
       const results: DayResult[] = []
-      for (const { date, label } of SHIP_DATES) {
+      for (const { date, label } of months) {
         const ctx: DecideContext = { settings, shipDate: date, today: date, origin, zipDb, forecasts }
         const t0 = performance.now()
         const decisions = orders.map((o) => decide(o, ctx))
@@ -244,8 +264,10 @@ describe('impact', () => {
       }
 
       const judged = results.reduce((s, r) => s + r.orders, 0)
+      const days = results.length
+      const perDay = (n: number) => n / days
       const sum = (f: (r: DayResult) => number) => results.reduce((s, r) => s + f(r), 0)
-      console.log('\n--- across all seven days ---')
+      console.log('\n--- across all twelve months ---')
       console.log(`orders judged                              ${judged}`)
       console.log(`hottest day was not the ship day           ${sum((r) => r.worstNotShipDay)} (${pct(sum((r) => r.worstNotShipDay), judged)}%)`)
       console.log(`under-packed by checking origin today      ${sum((r) => r.underByOriginToday)} (${pct(sum((r) => r.underByOriginToday), judged)}%)`)
@@ -258,6 +280,23 @@ describe('impact', () => {
       console.log(`ice packs not pulled                       ${sum((r) => r.icePacksSaved)}`)
       console.log(`slowest decide() for 50 orders             ${Math.max(...results.map((r) => r.decideMs)).toFixed(1)} ms`)
       console.log(`distinct locations fetched                 ${points.size}`)
+
+      // --- projected over a year, from the measured per-day averages ---
+      const ordersPerDay = perDay(judged)
+      const packagingSavedPerDay = perDay(sum((r) => r.costDouble) - sum((r) => r.costEngine))
+      const underPerDay = perDay(sum((r) => r.underByDestToday))
+      const valuePerDay = perDay(sum((r) => r.valueUnderpacked))
+      const minutesManualPerDay = (ordersPerDay * SECONDS_PER_MANUAL_CHECK) / 60
+
+      console.log('\n--- projected over a year ---')
+      console.log(`assumed ${SHIPPING_DAYS_PER_YEAR} shipping days and ${SECONDS_PER_MANUAL_CHECK}s to check one order by hand`)
+      console.log(`orders judged per shipping day             ${ordersPerDay.toFixed(0)}`)
+      console.log(`orders a year                              ${(ordersPerDay * SHIPPING_DAYS_PER_YEAR).toFixed(0)}`)
+      console.log(`packaging avoided a year                   $${(packagingSavedPerDay * SHIPPING_DAYS_PER_YEAR).toFixed(0)}`)
+      console.log(`under-protected orders caught a year       ${(underPerDay * SHIPPING_DAYS_PER_YEAR).toFixed(0)}`)
+      console.log(`product value on those orders a year       $${(valuePerDay * SHIPPING_DAYS_PER_YEAR).toFixed(0)}`)
+      console.log(`checking by hand, per day                  ${minutesManualPerDay.toFixed(0)} min`)
+      console.log(`checking by hand, per year                 ${((minutesManualPerDay * SHIPPING_DAYS_PER_YEAR) / 60).toFixed(0)} hours`)
     console.log('')
   })
 })

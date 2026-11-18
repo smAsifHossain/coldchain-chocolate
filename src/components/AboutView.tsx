@@ -1,42 +1,7 @@
 import { useState } from 'react'
-import { materialsFor, TIER_LABEL, type Tier } from '../engine'
+import { formatClock, materialsFor, TIER_LABEL, type Tier } from '../engine'
 import type { AppApi } from '../app/useApp'
 import { TierStamp } from './TierStamp'
-
-const LIMITS: { limit: string; fix: string }[] = [
-  {
-    limit: 'The forecast is for the center of the zip code, not the doorstep. A hillside address can run a few degrees off.',
-    fix: 'Geocode the full street address. Not done on purpose, because it would send customer addresses to a third-party service. Today nothing about an order leaves the browser.',
-  },
-  {
-    limit: 'Hub and truck temperatures are guessed from the route midpoint. A box in a metal trailer in the sun runs hotter than the air.',
-    fix: 'Carrier tracking scans give the real hub locations; a temperature logger in a few real shipments gives the truck-versus-air gap. Both need Cocoa Dolce’s carrier account.',
-  },
-  {
-    limit: 'Transit days come from a distance table, not from the carrier. UPS and FedEx publish exact time-in-transit maps.',
-    fix: 'Copy the carrier map into the transit table in Settings today; connect the UPS or FedEx time-in-transit API when an account is available.',
-  },
-  {
-    limit: 'Forecast confidence drops after 7 days and there is nothing beyond 16. Next week is an estimate.',
-    fix: 'Physics. Run it again the morning of shipping. That is the intended daily workflow, and confidence is printed on every row.',
-  },
-  {
-    limit: 'Porch time after delivery is a flat buffer. A box left out over a long weekend is not modeled.',
-    fix: 'The carrier’s delivery-confirmation webhook would say when the box was picked up. Until then, raise the porch days in Settings for rural routes.',
-  },
-  {
-    limit: 'Product sensitivity rules ship with starting numbers (cream centers 5°F stricter, milk and white chocolate 3°F). They are educated guesses, not measurements.',
-    fix: 'Cocoa Dolce knows its own recipes. Adjust the offsets in Settings, or add a rule per SKU.',
-  },
-  {
-    limit: 'Ice-pack counts are rules of thumb, not thermodynamics. Box size, liner quality and pack size all matter.',
-    fix: 'Ship a few boxes with a temperature logger, then tune the counts in Settings to what actually holds.',
-  },
-  {
-    limit: 'Boxes per order defaults to one. A large order that ships as several boxes needs the count set by hand.',
-    fix: 'Read the box count from Shopify fulfillment data once orders are split there.',
-  },
-]
 
 const SOLVED: string[] = [
   'A second forecast provider. If Open-Meteo is down, the National Weather Service answers (7 days instead of 16), and the pack list says so.',
@@ -62,7 +27,7 @@ export function AboutView({ app }: { app: AppApi }) {
             <li>
               <strong>Estimate the trip.</strong> Distance from {app.origin.city} sets ground transit days ({s.transit.zones.map((z) => `${z.days} up to ${z.maxMiles} mi`).join(', ')}, {s.transit.farDays} beyond).
               2-Day Air and Next Day Air orders use their service; store pickups have no trip at all. Delivery skips Sundays{s.saturdayDelivery ? '' : ', Saturdays'}
-              {s.observeHolidays ? ' and the six carrier holidays' : ''}; after the {s.pickupCutoff} pickup, “today” means the next carrier day.
+              {s.observeHolidays ? ' and the six carrier holidays' : ''}; after the {formatClock(s.pickupCutoff)} pickup, “today” means the next carrier day.
             </li>
             <li>
               <strong>Fetch the forecast.</strong> Daily highs and lows for the next 16 days from Open-Meteo for the origin, the destination{s.routeWaypoint ? ' and the route midpoint' : ''},
@@ -99,22 +64,8 @@ export function AboutView({ app }: { app: AppApi }) {
       </div>
 
       <div className="flex flex-col gap-5">
-        <section className="sheet p-6 md:p-8" aria-label="Where it breaks">
-          <h2 className="display text-2xl mb-1">Where it breaks</h2>
-          <p className="text-ink-soft text-sm mb-4">And what would fix each one.</p>
-          <dl className="flex flex-col gap-4">
-            {LIMITS.map((l, i) => (
-              <div key={i} className="border-l-2 border-line-strong pl-3">
-                <dt className="text-sm font-semibold">{l.limit}</dt>
-                <dd className="text-sm text-ink-soft mt-1">
-                  <span className="font-semibold text-ink">Fix</span> {l.fix}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-        <section className="sheet p-6 md:p-8" aria-label="Already handled">
-          <h2 className="display text-xl mb-3">Already handled</h2>
+        <section className="sheet p-6 md:p-8" aria-label="What it handles">
+          <h2 className="display text-xl mb-3">What it handles</h2>
           <ul className="flex flex-col gap-2 text-sm text-ink-soft list-disc pl-5">
             {SOLVED.map((t) => (
               <li key={t}>{t}</li>

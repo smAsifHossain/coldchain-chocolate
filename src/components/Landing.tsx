@@ -7,16 +7,14 @@ interface Props {
   app: AppApi
   onOpenPlanner: () => void
   onDemo: () => void
-  onAbout: () => void
 }
 
-export function Landing({ app, onOpenPlanner, onDemo, onAbout }: Props) {
+export function Landing({ app, onOpenPlanner, onDemo }: Props) {
   return (
     <div className="flex flex-col">
       <Hero app={app} onOpenPlanner={onOpenPlanner} onDemo={onDemo} />
       <Simulation app={app} />
       <HowItWorks app={app} />
-      <Limits onAbout={onAbout} />
     </div>
   )
 }
@@ -245,33 +243,6 @@ function HowItWorks({ app }: { app: AppApi }) {
           </li>
         ))}
       </ol>
-    </section>
-  )
-}
-
-function Limits({ onAbout }: { onAbout: () => void }) {
-  return (
-    <section className="bg-paper border-t border-line" aria-label="Limits">
-      <div className="mx-auto w-full max-w-7xl px-4 md:px-6 py-12 md:py-16 grid gap-8 lg:grid-cols-[2fr_3fr] lg:items-start">
-        <div>
-          <h2 className="display text-3xl md:text-4xl mb-3">Where it breaks</h2>
-          <p className="text-ink-soft max-w-prose">A forecast is not a thermometer in the truck. The tool says so, row by row, and never invents a temperature it does not have.</p>
-          <button className="btn mt-6" onClick={onAbout}>
-            All ten limits, with the fix for each
-          </button>
-        </div>
-        <ul className="flex flex-col gap-4">
-          {[
-            'The forecast is for the center of the zip code, not the doorstep. A hillside address can run a few degrees off.',
-            'Transit days come from a distance table, not the carrier. The table is editable, and a carrier quote always wins.',
-            'If the forecast service is unreachable, the last saved forecast is shown and labeled; with nothing saved, every order defaults to double thermal and says to check by hand.',
-          ].map((t) => (
-            <li key={t} className="border-l-2 border-line-strong pl-4 text-ink-soft">
-              {t}
-            </li>
-          ))}
-        </ul>
-      </div>
     </section>
   )
 }

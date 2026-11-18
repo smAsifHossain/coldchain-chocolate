@@ -65,6 +65,15 @@ export function formatLong(s: ISODate): string {
   })
 }
 
+/** "15:00" reads as "3 PM", "15:30" as "3.30 PM". */
+export function formatClock(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  if (!Number.isFinite(h)) return hhmm
+  const suffix = h >= 12 ? 'PM' : 'AM'
+  const hour = h % 12 === 0 ? 12 : h % 12
+  return m ? `${hour}.${String(m).padStart(2, '0')} ${suffix}` : `${hour} ${suffix}`
+}
+
 export function weekdayName(s: ISODate): string {
   return WEEKDAY[dayOfWeek(s)]
 }
