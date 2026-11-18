@@ -62,6 +62,50 @@ every screen where that matters.
 - Keeps orders, settings, overrides and ticks on the device. Nothing about an
   order leaves the browser.
 
+## What it catches
+
+The case for checking the whole trip rather than today's weather is testable, so
+it is tested. `npm run impact` runs the real engine over the 50-order sample
+against **real recorded temperatures** from the Open-Meteo archive, on seven
+dates spread across 2026, and compares the result with the shortcuts a busy
+person actually takes. Nothing below is estimated. Re-run it and the numbers
+come out the same.
+
+Across 343 order-days:
+
+| Measure | Result |
+| --- | ---: |
+| Orders whose hottest day was **not** the ship day | **208 of 343 (61%)** |
+| Under-protected by checking the destination's weather that morning | 60 (17%) |
+| Under-protected by checking only the delivery day | 97 (28%) |
+| Under-protected by checking Wichita's weather that morning | 65 (19%) |
+| Product value carried by those under-protected orders | **$3,166** |
+| Packaging the engine asks for, against double-packing everything | $1,811 vs $2,187 |
+| Liners and ice packs not pulled | 106 liners, 189 ice packs |
+| Time to decide 50 orders, after the forecast arrives | under 20 ms |
+| Forecast requests for a 50-order day | 2 |
+
+"Under-protected" means the shortcut lands on a lower tier than the full window
+calls for, so the box ships with less protection than the rules require.
+
+The annual averages hide the real pattern, which is that **the shortcuts fail
+worst in the shoulder seasons**, when Wichita is mild but the destinations are
+not:
+
+| Ship day | Needs ice | Checking Wichita that morning would under-protect | Packaging |
+| --- | ---: | ---: | ---: |
+| January 14 | 4 of 49 | 13 (27%) | $44 instead of $312 |
+| April 15 | 45 of 49 | 14 (29%) | $293 |
+| July 15 | 49 of 49 | 0 (0%) | $312 |
+| September 16 | 49 of 49 | 0 (0%) | $312 |
+| October 14 | 30 of 49 | **38 (78%)** | $225 |
+
+In July the shortcut is harmless, because everything needs ice anyway. In
+October it misses 78 percent of the orders that need protection. In January the
+engine calls for 86 percent less packaging than double-packing the whole table.
+Those two failure modes, melted product in the shoulder seasons and wasted
+material in winter, are the reason the tool exists.
+
 ## How an order is judged
 
 1. **Find the destination.** The zip is cleaned (ZIP+4 trimmed, Excel's dropped
@@ -179,6 +223,7 @@ path to match GitHub Pages.
 | `npm run build` | Type-check and production build to `dist/` |
 | `npm run preview` | Serve the production build |
 | `npm test` | Run the engine test suite once |
+| `npm run impact` | Impact analysis against real recorded weather, prints the table above |
 | `npm run typecheck` | TypeScript only |
 | `npm run zips` | Rebuild `public/data/zips.json` from GeoNames (US, PR, VI, GU) |
 | `node scripts/build-icons.mjs` | Regenerate the PNG app icons from the seal geometry |

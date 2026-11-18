@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "lint": "oxlint",
     "typecheck": "tsc -b --noEmit",
-    "zips": "node scripts/build-zips.mjs"
+    "zips": "node scripts/build-zips.mjs",
+    "impact": "vitest run --config vitest.impact.config.ts"
   },
   "dependencies": {
     "papaparse": "^5.7.0",
