@@ -290,24 +290,6 @@ products are sent. Settings, the day's orders, overrides and ticks are stored in
 the browser's local storage on the device that made them, and "Clear orders"
 removes the order list.
 
-## Known limitations
-
-Each of these is also listed inside the app with what would fix it.
-
-- The forecast is for the center of the zip code, not the doorstep. Geocoding the
-  street address was left out on purpose to avoid sending customer addresses to a
-  third party.
-- Hub and truck temperatures are approximated by the route midpoint and the air
-  temperature. A box in a trailer in the sun runs hotter.
-- Transit days come from a distance table, not a carrier's time-in-transit map.
-  The table is editable.
-- Forecast confidence drops after seven days and nothing exists beyond sixteen.
-  The intended workflow is to run it the morning of shipping.
-- The day after delivery is a flat one-day buffer.
-- Product sensitivity offsets and ice-pack counts are starting values, not
-  measurements. A temperature logger in a few real shipments would calibrate them.
-- Boxes per order defaults to one and is set by hand for large orders.
-
 ## Data sources
 
 - [Open-Meteo](https://open-meteo.com/) forecast API, CC BY 4.0, no key required.
